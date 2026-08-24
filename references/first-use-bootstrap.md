@@ -19,6 +19,8 @@ The current Codex task may be interrupted when Desktop must close. Before asking
 | Route, auth and model disagree | Do not capture the state; resolve the mismatch first |
 | Snapshot exists but its post-restart validation is missing | Resume the recorded bootstrap phase rather than starting over |
 
+Before a first transition between official and API-compatible modes, add a read-only history-provider checkpoint. Inventory all active and archived local provider values. If the installed Codex build has proved the shared `openai` identity contract and the inventory is mixed, require a separate approved history-preparation operation while every Codex writer is stopped. The credential bootstrap resumes only after that operation has its own verified manifest and fingerprint.
+
 ## Durable bootstrap record
 
 Store only metadata such as:
@@ -58,17 +60,18 @@ Every phase transition must be idempotent. Repeating the resume command after a 
 1. Verify and protect the current known-good API state, if one exists.
 2. Confirm Codex Desktop, CLI and helper writers are stopped.
 3. Stage the official route by removing API endpoint overrides and applying only the owned official-mode fields.
-4. Write <code>interactive_login_required</code> before starting Codex.
-5. Tell the user to reopen Codex and complete the official OAuth flow in the official route.
-6. After login, require another complete Codex shutdown so the bootstrap process can inspect a stable credential store.
-7. Resume from the checkpoint and verify:
+4. Confirm the live route still uses the verified `model_provider = "openai"` identity. If old local provider metadata is mixed, finish the separately approved normalization and its rollback validation now.
+5. Write <code>interactive_login_required</code> before starting Codex.
+6. Tell the user to reopen Codex and complete the official OAuth flow in the official route.
+7. After login, require another complete Codex shutdown so the bootstrap process can inspect a stable credential store.
+8. Resume from the checkpoint and verify:
    - the active auth type is OAuth;
    - no API endpoint override remains;
    - a fresh official request succeeds;
    - the intended model is available;
    - a representative local task can be opened.
-8. Only then protect the official snapshot and mark the profile ready.
-9. Return to the user's requested final profile through the normal switch transaction.
+9. Only then protect the official snapshot and mark the profile ready.
+10. Return to the user's requested final profile through the normal switch transaction.
 
 If the OAuth flow fails or the route still points at an API provider, keep the previous known-good profile and leave a resumable failure state. Do not save the failed login as an official profile.
 

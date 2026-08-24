@@ -63,6 +63,9 @@ For each official account and API provider:
 
 Use synthetic fixtures, not private conversations, to cover:
 
+- mixed provider names across first-line session metadata, repeated thread-settings events and multiple SQLite stores;
+- provider names both equal and unequal in byte length to `openai`;
+- active and archived local sessions while cloud ChatGPT Work/Chat records remain untouched;
 - valid response item identifiers;
 - generic identifiers on different semantic item types;
 - recoverable and unrecoverable reasoning records;
@@ -75,6 +78,16 @@ Use synthetic fixtures, not private conversations, to cover:
 - rollback after partial repair.
 
 Acceptance requires structural parsing, relationship checks, SQLite integrity and a target-version resume test.
+
+For the shared-provider contract, additionally verify:
+
+- the live user configuration sets `model_provider = "openai"` in every official and API-compatible profile;
+- official mode omits the endpoint override and API-compatible mode supplies the intended top-level `openai_base_url`;
+- the historical normalization manifest reconciles every changed JSONL field and SQLite row;
+- no unexpected provider value remains in the intended local scope;
+- new sessions created after preparation record `openai` in both modes;
+- representative normalized old sessions resume through both modes after full restarts;
+- response-item compatibility is tested independently, so a provider-only pass cannot hide an `item_`/typed-ID failure.
 
 ## Network tests
 

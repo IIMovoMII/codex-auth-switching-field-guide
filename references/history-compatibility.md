@@ -77,6 +77,54 @@ Prefer one stable provider identity across official and API routes only after pr
 
 This is a version-specific design choice, not a universal constant.
 
+## Normalize local provider metadata to `openai`
+
+For the architecture in this guide, `openai` is the preferred common identity for official and API-compatible routes. Apply this rule only after the installed Codex build proves all of the following:
+
+- official mode works with `model_provider = "openai"` and no `openai_base_url`;
+- API-compatible mode works with the same provider identity plus a top-level `openai_base_url` override;
+- a new session in each mode records `openai` and remains discoverable;
+- representative old sessions can be resumed after a fixture normalization.
+
+Do not create a `[model_providers.openai]` table. `openai` is a reserved built-in identity. If either route cannot satisfy this contract, stop and retain version-specific provider identities instead of forcing history to match a theory.
+
+### Read-only inventory
+
+Before mutation, scan active and archived local history and group provider values by semantic location and thread identity. Known locations to verify in applicable builds include:
+
+- JSONL `session_meta.payload.model_provider`;
+- JSONL `event_msg.payload.thread_settings.model_provider_id` for `thread_settings_applied` events;
+- provider columns on the corresponding rows in every relevant SQLite thread index, such as `threads.model_provider`.
+
+These names are observations to confirm, not a permanent schema. Search structurally, report value counts without titles or messages, and discover every active database rather than editing only the first file found. Keep cloud-backed ChatGPT Work/Chat sessions outside the local rollout mutation scope.
+
+### Stopped-writer normalization
+
+After explicit user approval:
+
+1. fully stop Codex Desktop, CLI and helper processes that can append or rewrite state;
+2. take content-addressed JSONL backups and WAL-aware SQLite backups;
+3. write a durable manifest containing thread/record identity, old provider value, intended `openai` value, hashes and rollback data, but no conversation text;
+4. parse JSONL and update only the verified semantic provider fields;
+5. update explicit SQLite row IDs inside bounded transactions;
+6. leave unrelated records, cloud sessions, titles, content and project placement untouched;
+7. validate and commit the manifest only after all stores agree.
+
+An equal-length byte patch is not a general migration technique. If an old provider name and `openai` differ in byte length, use a stopped-writer structural rewrite with atomic replacement and verified backups. Even when lengths match, prefer the structural stopped-writer path unless a narrowly tested recovery case requires byte-level editing.
+
+The live user-level configuration must also keep `model_provider = "openai"` in every official and API-compatible profile so future sessions do not reintroduce mixed values. Provider normalization does not repair generic or type-incompatible response-item IDs; evaluate and repair those separately.
+
+### Provider acceptance checks
+
+Provider normalization succeeds only when:
+
+- every targeted JSONL line parses and every intended semantic provider field is `openai`;
+- each targeted SQLite row is `openai`, database `quick_check` or the stronger chosen integrity check passes, and manifest counts reconcile;
+- no out-of-scope cloud or unrelated local record changed;
+- a new official session and a new API-compatible session both record `openai`;
+- after a full restart, representative old sessions open and continue in both modes;
+- the named manifest can roll back a fixture without overwriting newer activity.
+
 ## Safe mutation protocol
 
 Default protocol:
@@ -119,6 +167,7 @@ History is prepared only when:
 - tool relationships are coherent;
 - SQLite integrity checks pass;
 - provider metadata matches the intended discovery strategy;
+- every targeted historical provider value and every newly created local session use the verified `openai` identity;
 - backups and the repair manifest are readable;
 - rollback has been tested against a fixture;
 - the target Codex build can open and continue representative old conversations.

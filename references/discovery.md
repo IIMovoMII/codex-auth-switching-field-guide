@@ -64,12 +64,16 @@ If official login has never happened on this machine, report that the official p
 Count and classify, without copying content into logs:
 
 - active and archived JSONL files;
-- session metadata provider values;
-- thread settings records that repeat provider identifiers;
+- distinct session metadata provider values and per-value counts;
+- distinct thread-settings provider identifiers and per-value counts;
 - response-item identifier families by semantic type;
-- SQLite thread rows and provider fields;
+- every relevant SQLite store, its thread-provider values and per-value counts;
 - WAL and shared-memory side files;
 - currently open or recently changing files.
+
+Reconcile the provider counts across semantic copies. A provider value present in one session metadata record but repeated in many thread-settings events is not several unrelated problems. Record which local thread IDs and storage layers would be in scope for normalization, but do not log titles or conversation text.
+
+Separately identify cloud-backed ChatGPT Work/Chat records. Do not infer that they are editable local rollouts merely because the combined desktop app displays them beside Codex tasks.
 
 Sample structure, hashes and timestamps rather than user messages. A useful report says “three reasoning items use an unexpected identifier family,” not what the user discussed.
 
@@ -88,6 +92,8 @@ For each intended route, determine:
 | Error shape | Are structured errors preserved or rewritten? |
 
 Use a minimal, non-sensitive probe. Separate connectivity, authentication and model availability so one failure is not misdiagnosed as another.
+
+For the shared-identity design, also prove that the installed build can create a new session with `model_provider = "openai"` in both modes: official routing with no endpoint override, and API-compatible routing with the top-level `openai_base_url` override. If either route requires a different provider identity, do not normalize history to `openai`.
 
 ## 7. Define the requested profile set
 

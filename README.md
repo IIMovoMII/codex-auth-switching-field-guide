@@ -41,7 +41,8 @@ Copying entire configuration files appears simple, but it silently freezes unrel
 | Several official accounts are used on the same Windows profile | Keep each OAuth snapshot protected and make account identity explicit before activation |
 | Several API providers expose different model catalogs | Bind endpoint, credential, model and proxy policy to each profile without cloning the whole config |
 | Plugins, MCP servers, skills or hooks are edited frequently | Start every switch from the live configuration so unrelated changes survive |
-| Relay-created conversations fail when resumed through the official endpoint | Scan and prepare local history separately, preserve valid records and keep a tested rollback manifest |
+| Old local conversations contain provider names from earlier relay definitions | Inventory active and archived history, then normalize every proven local provider field to `openai` before cross-mode use |
+| Relay-created conversations fail when resumed through the official endpoint | Prepare response-item compatibility separately from provider normalization, preserve valid records and keep a tested rollback manifest |
 | The first turn repeatedly reconnects or times out | Diagnose HTTPS, WebSocket, base-path and system-proxy behavior instead of blaming auth or history blindly |
 | No official OpenAI login has ever existed on the machine | Preserve the known API state, stage the official route, let the user complete OAuth, restart Codex and verify the resulting official session before capturing it |
 | No relay/API profile or key has ever been configured | Ask for non-secret endpoint and model choices, provide a local secret-entry path, restart Codex and verify the real route before calling the profile ready |
@@ -54,7 +55,7 @@ This guide is not intended to sync cloud ChatGPT conversations, bypass account p
 Copy this sentence into a new Codex task:
 
 ~~~text
-Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide, begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores and network routes, then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers, explicitly handling a missing official login and a missing API/relay configuration, using local secret entry rather than asking for keys in chat, preserving the live config's plugins, MCP servers, skills, hooks, permissions and projects, supporting provider-specific models and proxy policies, keeping history preparation separate, implementing first use as persistent restart checkpoints because some values can only be verified after Codex fully restarts, pausing for my confirmation before changing live credentials or conversation history, and finally validating every post-restart state, profile switching, rollback, network behavior and representative old-conversation resume.
+Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide, begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores and network routes, then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers, explicitly handling a missing official login and a missing API/relay configuration, using local secret entry rather than asking for keys in chat, preserving the live config's plugins, MCP servers, skills, hooks, permissions and projects, supporting provider-specific models and proxy policies, and using `model_provider = "openai"` for both official and API-compatible profiles only after proving that contract on the installed Codex build. Make history preparation a separate operation: scan every active and archived local rollout plus every relevant SQLite store, report distinct provider values without exposing conversation text, and, after my confirmation and a full Codex shutdown, use verified backups and a field-level rollback manifest to normalize all semantically equivalent local provider metadata to `openai`; keep cloud ChatGPT Work/Chat records out of scope, keep response-item ID repair separate, and ensure future sessions are also created as `openai`. Implement first use as persistent restart checkpoints because some values can only be verified after Codex fully restarts, pause for my confirmation before changing live credentials or conversation history, and finally validate every post-restart state, profile switching, rollback, network behavior, new-session metadata and representative old-conversation resume in both modes.
 ~~~
 
 This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
@@ -93,7 +94,7 @@ The switcher owns a narrow set of fields. Everything else remains live and keeps
 3. **Separate routing, authentication and history.** They interact, but they are different state domains.
 4. **Stop writers before sensitive changes.** Configuration, credentials and history should not be mutated while Codex processes can append or reload them.
 5. **Make first use a real workflow.** Detect whether the machine starts in official, API or inconsistent state; do not invent a missing credential snapshot.
-6. **Keep history repair out of the fast path.** Scan and prepare explicitly, then use a cheap fingerprint gate during switching.
+6. **Keep history repair out of the fast path.** Inventory and normalize historical provider identity once, run response-item repair separately, then use a cheap fingerprint gate during switching.
 7. **Journal before writing.** Every multi-file transition needs a recoverable previous state.
 8. **Verify the route, not just the TOML.** A syntactically valid profile can still use the wrong credential, proxy, transport or model.
 
@@ -116,6 +117,26 @@ The arrows are restart checkpoints, not one uninterrupted inspection. Stage the 
 
 A switcher cannot create an official OAuth session that has never existed, nor should it ask a model to read secrets. On first use, it records the known-good current state, guides the user through one intentional setup of the missing mode, validates it, and only then creates the second protected snapshot.
 
+## One provider identity for old and new local conversations
+
+For the official-plus-API-compatible architecture described here, the preferred target is:
+
+~~~toml
+model_provider = "openai"
+~~~
+
+Official mode removes `openai_base_url`; an API-compatible profile sets that top-level override and activates its own credential. The current [Codex configuration reference](https://developers.openai.com/codex/config-reference) identifies `openai` as the built-in default provider and `openai_base_url` as its endpoint override. Do not try to redefine the reserved built-in provider with a `[model_providers.openai]` table.
+
+Before relying on that layout, prove it on the installed Codex build and intended endpoint. Then run a separate history-preparation operation:
+
+1. scan active and archived local JSONL plus every relevant SQLite store and count each provider value;
+2. distinguish local rollouts from cloud ChatGPT Work/Chat records;
+3. fully stop every Codex writer, create database-aware backups and write a rollback manifest;
+4. structurally normalize every proven local provider field to `openai`, not only the first metadata line;
+5. validate JSONL, SQLite, new-session metadata and representative old-session resume in both official and API-compatible modes.
+
+Provider normalization makes local conversation identity consistent. It does not repair incompatible historical response-item IDs; run that semantic check in the same preparation phase but as a separate repair rule.
+
 ## Guide map
 
 | Read this | When you need to |
@@ -130,7 +151,8 @@ A switcher cannot create an official OAuth session that has never existed, nor s
 
 ## Hard-won lessons
 
-- A provider label can affect how local conversations are discovered even when the effective endpoint comes from another setting.
+- A provider label can affect how local conversations are discovered even when the effective endpoint comes from another setting; fixing only future configuration leaves old mixed-provider sessions behind.
+- Provider identity can be repeated in session metadata, thread-settings events and SQLite thread rows. Normalization must cover every semantic copy discovered for that build.
 - A relay that accepts HTTPS Responses requests may still reject or omit the Responses WebSocket route.
 - Repeated reconnect messages on the first turn can be a transport fallback symptom, not a damaged conversation.
 - OAuth and API credentials may share a live storage location; configuration switching alone does not switch identity.
@@ -159,7 +181,7 @@ The guide deliberately avoids distributing a ready-made credential manager. Loca
 
 The patterns are aimed at Codex Desktop and Codex CLI on Windows. They may help on other platforms, but path handling, process barriers, credential storage and filesystem semantics must be redesigned.
 
-An observed setup successfully kept a shared provider identity while changing the top-level endpoint and credential state. That is evidence for a pattern, not a promise that the same field names or semantics remain valid in every Codex release. Re-run discovery after upgrades.
+An observed setup successfully used `openai` for both future and historical local provider metadata while changing only the top-level endpoint and credential state. That is evidence for a pattern, not a promise that the same history fields or semantics remain valid in every Codex release. Re-run discovery after upgrades.
 
 ## Security
 

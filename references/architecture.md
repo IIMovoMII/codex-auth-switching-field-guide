@@ -87,6 +87,14 @@ Keep these concepts distinct:
 
 Several official accounts can share the same official route but require different protected OAuth snapshots. Several API providers may use the same provider identity but require different base URLs, keys and model choices.
 
+For a current Codex build that passes the compatibility probe, the preferred shared identity is the built-in `openai` provider:
+
+~~~toml
+model_provider = "openai"
+~~~
+
+Official profiles omit `openai_base_url`; API-compatible profiles set that top-level override. Do not define `[model_providers.openai]`, because the built-in identity is reserved. This contract must govern both the live configuration that creates future sessions and the separate history-preparation operation that normalizes old local session metadata. A profile must not silently choose a new provider label merely because its endpoint or model differs.
+
 This separation allows a user interface to show:
 
 ~~~text
@@ -121,6 +129,8 @@ If the API endpoint or key does not yet exist, collect endpoint/model intent and
 Use the symmetric flow. Register and protect the known-good API state, then guide the user through one official login. The login must occur after removing route overrides that would send the OAuth-backed request to a relay.
 
 The OAuth result must be inspected only after the login process and a subsequent clean shutdown have stabilized the credential store.
+
+Before the first official activation, run the read-only local-history provider inventory. If it finds mixed or non-`openai` provider metadata and the shared-identity probe has passed, pause for explicit approval and complete the separate stopped-writer history preparation before activating OAuth. Do not hide that repair inside the credential transaction.
 
 ### Inconsistent machine
 

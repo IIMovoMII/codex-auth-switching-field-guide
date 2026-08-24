@@ -25,12 +25,14 @@ When the user arrives through the README's one-prompt deployment sentence, treat
 4. Model route, credential and history compatibility as separate state domains.
 5. Design first use from the detected starting state. Handle "no official login yet" and "no API/relay configuration yet" explicitly; never manufacture either state.
 6. Collect endpoint and model choices separately from secrets. Provide a local masked or OS-supported secret-entry path and never ask the user to paste a key into chat.
-7. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
-8. Require a stopped-writer barrier before changing credentials or history.
-9. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
-10. Keep full history preparation separate from ordinary switching. Gate official-mode activation with a cheap fingerprint of the prepared history.
-11. Validate effective behavior after the relevant restart: route, authentication type, model availability, proxy path, transport, conversation resume, rollback and preservation of unrelated configuration.
-12. After any Codex upgrade, rerun discovery and the transport/history probes.
+7. Prove one stable provider identity for new conversations. For the built-in OpenAI route plus top-level endpoint-override architecture, use `model_provider = "openai"` in both official and API-compatible profiles only after the installed build and endpoint pass the probe; never redefine the reserved built-in `openai` provider table.
+8. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
+9. Before the first cross-mode activation, inventory provider values across active and archived local JSONL and every relevant SQLite store. Exclude cloud ChatGPT Work/Chat records.
+10. Require a stopped-writer barrier before changing credentials or history. With explicit user approval, normalize every proven semantic local provider field to `openai`, using database-aware backups and a field-level rollback manifest. Do not assume the first JSONL line is the only copy.
+11. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
+12. Keep full history preparation separate from ordinary switching. Treat provider normalization and response-item compatibility as separate rules, then gate official-mode activation with a cheap fingerprint of the prepared history.
+13. Validate effective behavior after the relevant restart: route, authentication type, model availability, proxy path, transport, new-session provider metadata, representative old-conversation resume in both modes, rollback and preservation of unrelated configuration.
+14. After any Codex upgrade, rerun discovery and the transport/history probes before trusting the `openai` normalization contract again.
 
 ## Non-negotiable safety rules
 
@@ -38,6 +40,8 @@ When the user arrives through the README's one-prompt deployment sentence, treat
 - Never mark a newly created profile ready from pre-restart file inspection alone.
 - Never replace an entire live configuration merely to change auth mode.
 - Never rewrite active JSONL history or raw-copy a live WAL database.
+- Never normalize provider values with global text replacement or assume all provider names have equal byte length.
+- Never change cloud ChatGPT Work/Chat records as though they were local rollout files.
 - Never rename generic response identifiers blindly. Classify records by semantic type.
 - Never fabricate a reasoning identifier when the protected reasoning payload required by the target endpoint is unavailable.
 - Preserve tool-call and tool-result pairing.
@@ -64,5 +68,6 @@ Produce a machine-specific design or implementation with:
 - secure credential handling;
 - transaction and rollback behavior;
 - a separate history-preparation command;
+- a redacted before/after inventory proving historical and future local provider metadata use the verified stable identity;
 - a versioned validation report;
 - known limits and recovery instructions.
