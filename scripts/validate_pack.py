@@ -16,6 +16,7 @@ REQUIRED = {
     "SECURITY.md",
     "references/discovery.md",
     "references/architecture.md",
+    "references/first-use-bootstrap.md",
     "references/history-compatibility.md",
     "references/network-diagnostics.md",
     "references/safety-and-rollback.md",

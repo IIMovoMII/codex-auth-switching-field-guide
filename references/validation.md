@@ -43,6 +43,8 @@ Test:
 | Expired OAuth | Require official reauthentication |
 | Invalid API key | Keep prior working profile active |
 
+For every row that creates a previously missing mode, test the required restart checkpoints. A pre-restart file inspection must never satisfy the post-restart acceptance gate.
+
 ## Profile matrix
 
 For each official account and API provider:
@@ -97,6 +99,8 @@ Inject interruption after every transaction stage. Also test:
 - full disk;
 - protected snapshot unavailable;
 - state changed between preflight and commit;
+- machine or Codex restarted between every bootstrap phase;
+- bootstrap resume command run twice;
 - rollback state changed by the user;
 - Codex process restarts during the barrier.
 

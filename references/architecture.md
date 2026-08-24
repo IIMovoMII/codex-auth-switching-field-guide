@@ -103,6 +103,8 @@ The displayed hierarchy does not require swapping full configs.
 
 ## First-use protocol
 
+Every first-use flow below is a durable multi-stage workflow. Persist a checkpoint before each required shutdown or restart, and do not mark a profile ready until a fresh Codex process has loaded and passed the expected probes. See [first use and restart checkpoints](first-use-bootstrap.md).
+
 ### Machine currently in official mode
 
 1. Validate that the route and credential are genuinely official.
@@ -112,9 +114,13 @@ The displayed hierarchy does not require swapping full configs.
 5. Capture the API state only after a successful minimal request.
 6. Restore the requested final mode through the normal transaction engine.
 
+If the API endpoint or key does not yet exist, collect endpoint/model intent and use a local secret-entry path before the staged restart. Do not ask for the key in chat.
+
 ### Machine currently in API mode
 
 Use the symmetric flow. Register and protect the known-good API state, then guide the user through one official login. The login must occur after removing route overrides that would send the OAuth-backed request to a relay.
+
+The OAuth result must be inspected only after the login process and a subsequent clean shutdown have stabilized the credential store.
 
 ### Inconsistent machine
 

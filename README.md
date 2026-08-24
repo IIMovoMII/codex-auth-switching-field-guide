@@ -43,7 +43,9 @@ Copying entire configuration files appears simple, but it silently freezes unrel
 | Plugins, MCP servers, skills or hooks are edited frequently | Start every switch from the live configuration so unrelated changes survive |
 | Relay-created conversations fail when resumed through the official endpoint | Scan and prepare local history separately, preserve valid records and keep a tested rollback manifest |
 | The first turn repeatedly reconnects or times out | Diagnose HTTPS, WebSocket, base-path and system-proxy behavior instead of blaming auth or history blindly |
-| Only one login mode has ever existed on the machine | Register the known-good state first, then guide one intentional setup of the missing mode |
+| No official OpenAI login has ever existed on the machine | Preserve the known API state, stage the official route, let the user complete OAuth, restart Codex and verify the resulting official session before capturing it |
+| No relay/API profile or key has ever been configured | Ask for non-secret endpoint and model choices, provide a local secret-entry path, restart Codex and verify the real route before calling the profile ready |
+| Some settings are observable only after a Codex restart | Persist a bootstrap checkpoint, tell the user exactly what to do next, and continue post-restart verification instead of claiming success in one pass |
 
 This guide is not intended to sync cloud ChatGPT conversations, bypass account policy, share credentials between people, or provide a universal executable that assumes every Codex release has the same storage layout.
 
@@ -52,7 +54,7 @@ This guide is not intended to sync cloud ChatGPT conversations, bypass account p
 Copy this sentence into a new Codex task:
 
 ~~~text
-Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide, begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores and network routes, then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers, preserving the live config's plugins, MCP servers, skills, hooks, permissions and projects, supporting provider-specific models and proxy policies, never exposing secrets in chat or logs, keeping history preparation as a separate operation, pausing for my confirmation before changing live credentials or conversation history, and finally validating profile switching, rollback, network behavior and representative old-conversation resume.
+Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide, begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores and network routes, then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers, explicitly handling a missing official login and a missing API/relay configuration, using local secret entry rather than asking for keys in chat, preserving the live config's plugins, MCP servers, skills, hooks, permissions and projects, supporting provider-specific models and proxy policies, keeping history preparation separate, implementing first use as persistent restart checkpoints because some values can only be verified after Codex fully restarts, pausing for my confirmation before changing live credentials or conversation history, and finally validating every post-restart state, profile switching, rollback, network behavior and representative old-conversation resume.
 ~~~
 
 This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
@@ -110,6 +112,8 @@ flowchart TD
     P --> R[Profiles are ready]
 ~~~
 
+The arrows are restart checkpoints, not one uninterrupted inspection. Stage the intended change, save progress, fully restart Codex, verify what the fresh process actually loaded, and only then advance to the next phase.
+
 A switcher cannot create an official OAuth session that has never existed, nor should it ask a model to read secrets. On first use, it records the known-good current state, guides the user through one intentional setup of the missing mode, validates it, and only then creates the second protected snapshot.
 
 ## Guide map
@@ -118,6 +122,7 @@ A switcher cannot create an official OAuth session that has never existed, nor s
 | --- | --- |
 | [Discovery](references/discovery.md) | Inventory Codex, configuration, credentials, history and endpoint capabilities |
 | [Architecture](references/architecture.md) | Define profile ownership, first-use flow and transactions |
+| [First use and restart checkpoints](references/first-use-bootstrap.md) | Initialize a missing official or API state across the required Codex restarts |
 | [History compatibility](references/history-compatibility.md) | Keep local conversations resumable across auth modes |
 | [Network diagnostics](references/network-diagnostics.md) | Separate HTTPS, WebSocket, relay and system-proxy failures |
 | [Safety and rollback](references/safety-and-rollback.md) | Protect credentials and recover from interrupted writes |
@@ -129,6 +134,7 @@ A switcher cannot create an official OAuth session that has never existed, nor s
 - A relay that accepts HTTPS Responses requests may still reject or omit the Responses WebSocket route.
 - Repeated reconnect messages on the first turn can be a transport fallback symptom, not a damaged conversation.
 - OAuth and API credentials may share a live storage location; configuration switching alone does not switch identity.
+- A valid pre-restart file is only a staged intention. Values that Codex loads at process start must be verified from a fresh process before the profile is marked ready.
 - A historical response item with a generic identifier is not automatically valid for an official endpoint that expects a typed identifier.
 - Reasoning records are special: if their required protected content cannot be recovered, deleting the model-input copy can be safer than fabricating an identifier.
 - SQLite databases using WAL require database-aware backup and integrity checks.

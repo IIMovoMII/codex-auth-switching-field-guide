@@ -23,16 +23,19 @@ When the user arrives through the README's one-prompt deployment sentence, treat
 2. Report state without reading secret values into the conversation. Show credential type and consistency, not token contents.
 3. Define the switcher's owned fields. Preserve every unrelated live setting, including plugins, MCP servers, skills, hooks, permissions and project configuration.
 4. Model route, credential and history compatibility as separate state domains.
-5. Design first use from the detected starting state. Never manufacture an OAuth session or assume a missing API credential.
-6. Require a stopped-writer barrier before changing credentials or history.
-7. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
-8. Keep full history preparation separate from ordinary switching. Gate official-mode activation with a cheap fingerprint of the prepared history.
-9. Validate effective behavior: route, authentication type, model availability, proxy path, transport, conversation resume, rollback and preservation of unrelated configuration.
-10. After any Codex upgrade, rerun discovery and the transport/history probes.
+5. Design first use from the detected starting state. Handle "no official login yet" and "no API/relay configuration yet" explicitly; never manufacture either state.
+6. Collect endpoint and model choices separately from secrets. Provide a local masked or OS-supported secret-entry path and never ask the user to paste a key into chat.
+7. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
+8. Require a stopped-writer barrier before changing credentials or history.
+9. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
+10. Keep full history preparation separate from ordinary switching. Gate official-mode activation with a cheap fingerprint of the prepared history.
+11. Validate effective behavior after the relevant restart: route, authentication type, model availability, proxy path, transport, conversation resume, rollback and preservation of unrelated configuration.
+12. After any Codex upgrade, rerun discovery and the transport/history probes.
 
 ## Non-negotiable safety rules
 
 - Never expose, log, commit or ask a model to inspect credential values.
+- Never mark a newly created profile ready from pre-restart file inspection alone.
 - Never replace an entire live configuration merely to change auth mode.
 - Never rewrite active JSONL history or raw-copy a live WAL database.
 - Never rename generic response identifiers blindly. Classify records by semantic type.
@@ -45,6 +48,7 @@ When the user arrives through the README's one-prompt deployment sentence, treat
 
 - Start with [discovery](references/discovery.md).
 - Read [architecture](references/architecture.md) before implementation.
+- Read [first use and restart checkpoints](references/first-use-bootstrap.md) whenever either auth mode is absent or a setting needs a fresh Codex process to verify.
 - Read [history compatibility](references/history-compatibility.md) whenever existing conversations must survive a route or auth change.
 - Read [network diagnostics](references/network-diagnostics.md) for reconnects, timeouts, proxy behavior or endpoint differences.
 - Read [safety and rollback](references/safety-and-rollback.md) before any mutation.
