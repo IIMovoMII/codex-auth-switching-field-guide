@@ -33,6 +33,30 @@ A single Codex installation may need to alternate between:
 
 Copying entire configuration files appears simple, but it silently freezes unrelated settings. Reusing one credential file without a transaction can leave configuration and authentication out of sync. Rewriting active conversation files can corrupt history. Treat switching as a state transition, not a file-copy trick.
 
+## Concrete use cases
+
+| Situation | What a machine-specific implementation should achieve |
+| --- | --- |
+| One PC alternates between official OAuth and an API-compatible relay | Switch route and credential as one transaction while keeping one evolving Codex configuration |
+| Several official accounts are used on the same Windows profile | Keep each OAuth snapshot protected and make account identity explicit before activation |
+| Several API providers expose different model catalogs | Bind endpoint, credential, model and proxy policy to each profile without cloning the whole config |
+| Plugins, MCP servers, skills or hooks are edited frequently | Start every switch from the live configuration so unrelated changes survive |
+| Relay-created conversations fail when resumed through the official endpoint | Scan and prepare local history separately, preserve valid records and keep a tested rollback manifest |
+| The first turn repeatedly reconnects or times out | Diagnose HTTPS, WebSocket, base-path and system-proxy behavior instead of blaming auth or history blindly |
+| Only one login mode has ever existed on the machine | Register the known-good state first, then guide one intentional setup of the missing mode |
+
+This guide is not intended to sync cloud ChatGPT conversations, bypass account policy, share credentials between people, or provide a universal executable that assumes every Codex release has the same storage layout.
+
+## Deploy in one prompt
+
+Copy this sentence into a new Codex task:
+
+~~~text
+Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide, begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores and network routes, then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers, preserving the live config's plugins, MCP servers, skills, hooks, permissions and projects, supporting provider-specific models and proxy policies, never exposing secrets in chat or logs, keeping history preparation as a separate operation, pausing for my confirmation before changing live credentials or conversation history, and finally validating profile switching, rollback, network behavior and representative old-conversation resume.
+~~~
+
+This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
+
 ## Architecture
 
 ~~~mermaid

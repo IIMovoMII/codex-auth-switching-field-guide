@@ -7,6 +7,16 @@ description: Use when designing, auditing, or repairing a machine-specific Windo
 
 Build a bespoke solution for the current machine. Do not install or copy a universal switcher.
 
+## Applicable scenarios
+
+Use this guide when the machine needs any combination of official OAuth accounts, API-compatible endpoints, provider-specific models, preserved live Codex configuration, cross-mode local history, or transport/proxy diagnosis.
+
+Do not treat it as a cloud-chat migration method, an account-policy bypass, or a portable credential-sharing mechanism.
+
+## One-prompt kickoff
+
+When the user arrives through the README's one-prompt deployment sentence, treat it as authorization for read-only discovery and construction of a local solution. It is not blanket authorization to expose credentials, install third-party software, switch the live account, or mutate conversation history. Pause immediately before those sensitive actions when they become necessary.
+
 ## Workflow
 
 1. Start with read-only discovery. Identify the Codex version, active processes, configuration source, credential store, active route, model, history stores, proxy behavior and requested profile set.
