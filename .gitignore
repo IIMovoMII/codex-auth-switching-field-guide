@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.tmp
+*.bak
+auth.json
+*.token
+*.secret
+local-state/
+fixtures/private/
