@@ -33,13 +33,15 @@ The active credential may need to remain in Codex's expected plain file format. 
 
 Before a sensitive transition:
 
-1. identify all Desktop, CLI and helper processes that can read or write the state;
+1. identify all Desktop, CLI, helper and external config-manager processes that can read or write the state;
 2. ask the user to close them;
 3. wait for clean exit with a bounded timeout;
 4. refuse the write if any writer remains;
 5. create a short maintenance marker for notification monitors.
 
 Do not terminate unrelated processes by name. Resolve exact executable paths and parent relationships.
+
+CC Switch and a custom live-config switcher are incompatible owners of one Codex `config.toml`. A process-name check is only a convenience guard; the real safety rule is that the user selects one writer and stops using the other for Codex configuration.
 
 ## Transaction journal
 
@@ -58,12 +60,18 @@ Write and flush the journal before the first state mutation. Update it after eac
 
 ## Backup rules
 
+- Before introducing a config manager, ask the user to save one complete config that has passed a real request from a fresh Codex process.
+- Do not require an ever-growing config archive. One deliberately managed known-good config is a valid bounded recovery policy; replace it only after the new state is accepted and tested.
 - Use sibling temporary files on the same volume for atomic replacement.
 - Verify a backup hash before relying on it.
 - Use the SQLite backup API and an integrity check; do not treat the main database file alone as a complete WAL-aware backup.
 - Keep history repair backups separate from ordinary profile snapshots.
 - Apply retention limits only after at least one known-good rollback point exists.
 - Never restore a full older history file over content that changed after the backup.
+
+Config backup and history-repair backup are different things. The first protects a relatively small user configuration; the second may contain private conversations and live database state and must follow the stricter history workflow.
+
+If `config.toml` is empty or reduced to a generic template, ordinary switching must stop. Use the offline playbook in [config recovery and external writers](config-recovery.md). When no good config exists, label reconstructed values explicitly and never invent missing commands, paths, endpoints or models.
 
 ## Rollback rules
 

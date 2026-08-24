@@ -29,6 +29,17 @@ Create a fixture with representative unrelated settings:
 
 Switch through every profile and assert that only owned fields change. Add a new plugin while one profile is active, switch away and back, and confirm it survives.
 
+Also inject external-writer damage:
+
+- an empty `config.toml`;
+- malformed TOML;
+- a much smaller generic/common-provider template;
+- missing plugin, MCP, skill, hook, permission and project keys;
+- a stale `model_provider` name with no matching definition;
+- a competing config manager running during preflight.
+
+Ordinary switching must stop before changing route or credentials. Exercise both recovery routes: restore a user-managed known-good config, and reconstruct a minimal config when no backup exists. The no-backup report must distinguish recovered evidence, user-supplied values and unknown values.
+
 ## First-use matrix
 
 Test:
@@ -58,6 +69,8 @@ For each official account and API provider:
 - a new conversation works;
 - a representative existing conversation resumes;
 - a second switch returns to the previous profile cleanly.
+
+For a multi-relay implementation, use at least two fixture relays with different model names and proxy policies. Confirm that switching changes only declared route/model/proxy fields, activates the matching credential, never copies one relay's model into another profile, and stops rather than silently substituting an unavailable model.
 
 ## History tests
 
@@ -116,6 +129,8 @@ Inject interruption after every transaction stage. Also test:
 - bootstrap resume command run twice;
 - rollback state changed by the user;
 - Codex process restarts during the barrier.
+- CC Switch or another config manager rewrites the live file between preflight and commit;
+- the user replaces the known-good config deliberately, proving that retention stays bounded rather than accumulating silently.
 
 ## Upgrade test
 

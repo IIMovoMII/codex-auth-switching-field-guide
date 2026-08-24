@@ -10,6 +10,7 @@ Record:
 - Codex Desktop and CLI versions;
 - whether Desktop and CLI use the same Codex home;
 - relevant process names and child processes;
+- CC Switch or any other config/profile manager that can rewrite the same Codex home, including startup or background behavior;
 - whether the current app combines ChatGPT and Codex surfaces;
 - configuration reload behavior observed in this build.
 
@@ -27,6 +28,7 @@ Discover rather than hard-code:
 - plugin, MCP, skill and hook configuration;
 - project or workspace metadata;
 - any existing profile-switcher state.
+- whether the user has a complete, known-good `config.toml` that passed a real request after restart; report presence only, never its values.
 
 Use placeholders such as <code>%USERPROFILE%\.codex</code> in reports. Never publish a real username or absolute home path.
 
@@ -41,6 +43,7 @@ Use a TOML parser when possible. Inventory:
 - feature flags related to transport or proxy handling;
 - plugins, MCP servers, skills, hooks, permissions and project entries;
 - config layers or profiles that can override each other.
+- signs that a complete config was replaced by a smaller generic/common template, such as missing previously expected subsystem tables.
 
 The report should identify where an effective value came from. A visually present field may be shadowed by another layer.
 
@@ -123,3 +126,5 @@ Produce a redacted table containing:
 - version-sensitive assumptions that must be validated.
 
 Stop here if the state is inconsistent. Resolve the mismatch before designing writes.
+
+If another manager owns the live config, stop and ask the user to select one writer. If the file is already empty, malformed or incomplete, follow [config recovery and external writers](config-recovery.md) before profile design.

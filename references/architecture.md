@@ -8,6 +8,8 @@ The safest design treats switching as a transaction across several independent s
 
 This remains the source of truth for everything that evolves during normal Codex use. The switcher reads it at switch time and changes only owned fields.
 
+Exactly one tool may own routing changes to this file. If CC Switch or another profile manager also projects saved profiles into the live file, the user must choose one owner and stop the other before implementation continues. See [config recovery and external writers](config-recovery.md).
+
 Typical owned fields may include:
 
 - provider identity;
@@ -41,6 +43,8 @@ preferred_model
 proxy_policy
 last_validated_codex_version
 ~~~
+
+Several API-compatible relays may each have a profile with its own endpoint, credential reference, model and proxy policy. This removes the need to keep CC Switch as a second Codex config owner. See [optional multi-relay profiles](multi-relay-profiles.md).
 
 An endpoint may be stored as ordinary configuration if it contains no credentials. Tokens and signed URLs belong in the protected credential boundary.
 
@@ -141,7 +145,7 @@ Examples include an official route with an API key, or an API endpoint with an O
 A robust transition follows these stages:
 
 1. acquire an exclusive switch lock;
-2. confirm all Codex writers are stopped;
+2. confirm all Codex writers and competing config managers are stopped;
 3. validate source state and target profile;
 4. check the target history gate when required;
 5. write the recovery journal;
