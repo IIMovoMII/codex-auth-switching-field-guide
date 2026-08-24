@@ -1,26 +1,28 @@
-# Security policy
+# 安全说明
 
-This repository contains documentation, not a credential service. Even so, examples and issue reports can accidentally expose private material.
+> English: [SECURITY.en.md](SECURITY.en.md)
 
-## Never publish
+本仓库只有经验文档，不提供凭据服务；但示例、问题报告和诊断输出仍可能意外泄露隐私。
 
-- <code>auth.json</code> or any equivalent credential file;
-- API keys, OAuth tokens, cookies or signed URLs;
-- private relay addresses;
-- real usernames, home directories or account IDs;
-- conversation bodies or unredacted rollout files;
-- encrypted snapshots together with material that weakens their protection.
+## 绝不能公开
 
-## Reporting a security issue
+- `auth.json` 或同类认证文件；
+- API Key、OAuth 令牌、Cookie 或带签名的网址；
+- 私有中转地址；
+- 真实用户名、用户目录或账号标识；
+- 对话正文或未经脱敏的 rollout 文件；
+- 加密快照及任何会削弱其保护的信息。
 
-Use a GitHub private security advisory for a vulnerability in this guide or its validator. Do not open a public issue containing secrets.
+## 报告安全问题
 
-If a secret was posted:
+如果指南或校验器存在安全漏洞，请使用 GitHub 私密安全公告，不要在公开问题中粘贴秘密。
 
-1. revoke or rotate it immediately;
-2. remove it from the visible content and Git history;
-3. invalidate related sessions where supported;
-4. review local and provider access logs;
-5. disclose only a redacted timeline.
+如果秘密已经公开：
 
-The repository maintainers cannot recover or secure credentials from a user's machine.
+1. 立即吊销或轮换；
+2. 从可见内容和 Git 历史中移除；
+3. 在平台支持时使相关会话失效；
+4. 检查本地及供应商访问日志；
+5. 只公开脱敏后的时间线。
+
+仓库维护者无法从用户电脑中恢复、保护或代管凭据。

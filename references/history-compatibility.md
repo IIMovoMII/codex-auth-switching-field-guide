@@ -1,173 +1,155 @@
-# History compatibility
+# 历史兼容
 
-Local conversation history is an API input cache, a UI record and an index at the same time. Repair must preserve all three roles.
+> English: [history-compatibility.en.md](history-compatibility.en.md)
 
-## Why a route switch can expose old defects
+本地对话历史同时承担 API 输入缓存、界面记录和索引三种角色，修复必须同时保护这三者。
 
-An API-compatible provider may return response items with identifiers or payload shapes that its own server accepts later. An official endpoint can apply stricter type-specific rules when the old conversation is resumed.
+## 为什么换路线会暴露旧缺陷
 
-A representative failure is a generic item identifier appearing where the target endpoint expects a reasoning-specific identifier. The important point is not one prefix: the repair decision depends on the semantic record type and the target version's protocol.
+API 兼容供应商可能返回自己的服务能够继续接受、但官方接口会更严格校验的响应项目编号或载荷。旧对话切回官方时，历史中的通用编号可能出现在要求特定类型编号的位置。
 
-## Storage layers to inspect
+关键不是某一个前缀，而是记录的语义类型、是否会再次进入模型输入，以及目标版本的协议要求。
 
-Depending on the Codex build, history can include:
+## 需要检查的存储层
 
-- append-only JSONL rollout files;
-- active and archived session roots;
-- first-line session metadata;
-- repeated thread-settings events;
-- response items that are later sent back to the model;
-- UI-only events;
-- SQLite thread indexes;
-- SQLite WAL and shared-memory files;
-- cloud-backed Chat or Work conversations that are not equivalent to local rollouts.
+不同 Codex 版本可能包含：
 
-Do not assume changing one metadata line updates every copy of a provider identity.
+- 追加式 JSONL rollout；
+- 当前及归档会话目录；
+- 首行会话元数据；
+- 重复线程设置事件；
+- 后续会重新发给模型的响应项目；
+- 只供界面显示的事件；
+- SQLite 线程索引；
+- SQLite WAL 和共享内存文件；
+- 与本地 rollout 不等价的云端 ChatGPT Work／Chat 会话。
 
-## Classify before changing
+只改第一行不能保证 provider 的所有语义副本都更新。
 
-For every suspicious record, identify:
+## 修改前先分类
 
-- JSONL record type;
-- response-item semantic type;
-- whether it is included in future model input;
-- whether it contains protected or encrypted reasoning material;
-- whether a tool call or tool result points to it;
-- whether the same identity appears in SQLite;
-- whether the file is still changing.
+每条可疑记录都要确认：
 
-A generic identifier on a user or assistant message does not justify the same transformation as a generic identifier on a reasoning item.
+- JSONL 记录类型；
+- 响应项目语义类型；
+- 是否进入未来模型输入；
+- 是否包含受保护或加密的推理材料；
+- 工具调用／结果是否引用它；
+- 同一身份是否存在于 SQLite；
+- 文件是否仍在变化。
 
-## Reasoning records
+用户消息上的通用编号，不能照搬 reasoning 项的修复规则。
 
-Reasoning items can have stronger invariants than ordinary messages. If the target endpoint requires protected content that is absent, simply renaming the identifier may create a record that looks valid but cannot be verified.
+## reasoning 记录
 
-Safer decision order:
+reasoning 项通常比普通消息有更强约束。目标接口要求受保护内容而历史中不存在时，只改编号会制造“看起来合法、实际无法验证”的记录。
 
-1. retain a record unchanged when it is already valid;
-2. use an exact, version-proven type conversion only when all required fields are present;
-3. remove only the model-input copy when the reasoning payload is unrecoverable;
-4. preserve UI-visible messages and independent event history;
-5. never synthesize protected reasoning or pretend an unverifiable item is authentic.
+安全决策顺序：
 
-The goal is resumability without falsifying protocol state.
+1. 已合法就原样保留；
+2. 只有在全部必需字段存在且当前版本实测过时，才做精确类型转换；
+3. 推理载荷无法恢复时，只从未来模型输入中移除那份副本；
+4. 保留独立的界面消息和事件历史；
+5. 永远不伪造受保护推理内容。
 
-## Tool relationships
+目标是恢复续聊能力，不是伪造协议状态。
 
-Before removing or rewriting any item, construct a relationship graph for:
+## 工具关系
 
-- tool call IDs;
-- tool result call IDs;
-- response-item IDs;
-- parent or previous-response references;
-- UI event references.
+删除或重写前，为以下标识建立关系图：
 
-Every retained tool result must still have a retained call. Every retained call that requires a result should remain coherent. A repair that fixes one identifier error but breaks call pairing is not successful.
+- 工具调用编号；
+- 工具结果引用编号；
+- 响应项目编号；
+- 父响应／前序响应引用；
+- 界面事件引用。
 
-## Provider metadata
+保留的工具结果必须仍有对应调用；需要结果的调用也要保持一致。修好编号却破坏调用配对，不算成功。
 
-If provider metadata affects session visibility, update every semantically equivalent location discovered for that Codex version. Typical locations include session metadata, thread-settings events and thread-index rows.
+## provider 元数据
 
-Prefer one stable provider identity across official and API routes only after proving that:
+provider 影响会话可见性时，要更新当前版本实际发现的全部等价位置，例如会话元数据、线程设置事件和线程索引行。
 
-- new sessions record it;
-- old sessions remain discoverable;
-- the live configuration can still express the route difference;
-- both endpoints accept the resulting request behavior.
+只有证明以下事实后，才考虑让官方和 API 路线共同使用一个身份：
 
-This is a version-specific design choice, not a universal constant.
+- 新会话会记录它；
+- 旧会话仍可发现；
+- 实时配置仍能表达路线差异；
+- 两端都接受最终请求行为。
 
-## Normalize local provider metadata to `openai`
+这是版本相关设计，不是永久常量。
 
-For the architecture in this guide, `openai` is the preferred common identity for official and API-compatible routes. Apply this rule only after the installed Codex build proves all of the following:
+## 把本地 provider 统一为 `openai`
 
-- official mode works with `model_provider = "openai"` and no `openai_base_url`;
-- API-compatible mode works with the same provider identity plus a top-level `openai_base_url` override;
-- a new session in each mode records `openai` and remains discoverable;
-- representative old sessions can be resumed after a fixture normalization.
+本指南的首选共同身份是 `openai`，但必须先证明：
 
-Do not create a `[model_providers.openai]` table. `openai` is a reserved built-in identity. If either route cannot satisfy this contract, stop and retain version-specific provider identities instead of forcing history to match a theory.
+- 官方模式使用 `model_provider = "openai"` 且没有 `openai_base_url` 时可用；
+- API 兼容模式使用同一身份并加顶层 `openai_base_url` 时可用；
+- 两种模式新建会话都记录 `openai` 且可发现；
+- 合成历史完成统一后，代表性旧会话能够续聊。
 
-### Read-only inventory
+不得定义 `[model_providers.openai]`。任一路线无法满足时，停止统一并保留版本专属 provider。
 
-Before mutation, scan active and archived local history and group provider values by semantic location and thread identity. Known locations to verify in applicable builds include:
+### 只读盘点
 
-- JSONL `session_meta.payload.model_provider`;
-- JSONL `event_msg.payload.thread_settings.model_provider_id` for `thread_settings_applied` events;
-- provider columns on the corresponding rows in every relevant SQLite thread index, such as `threads.model_provider`.
+按语义位置和线程身份统计当前及归档本地历史。适用版本中应核对但不能永久写死的位置包括：
 
-These names are observations to confirm, not a permanent schema. Search structurally, report value counts without titles or messages, and discover every active database rather than editing only the first file found. Keep cloud-backed ChatGPT Work/Chat sessions outside the local rollout mutation scope.
+- JSONL `session_meta.payload.model_provider`；
+- `thread_settings_applied` 事件中的 `event_msg.payload.thread_settings.model_provider_id`；
+- 每个相关 SQLite 线程索引中的 provider 列，例如 `threads.model_provider`。
 
-### Stopped-writer normalization
+结构化扫描，只报告值和数量，不报告标题、消息或真实线程标识；发现所有活动数据库，不能只编辑第一个。云端 Work／Chat 会话不进入本地修改范围。
 
-After explicit user approval:
+### 停止写入后统一
 
-1. fully stop Codex Desktop, CLI and helper processes that can append or rewrite state;
-2. take content-addressed JSONL backups and WAL-aware SQLite backups;
-3. write a durable manifest containing thread/record identity, old provider value, intended `openai` value, hashes and rollback data, but no conversation text;
-4. parse JSONL and update only the verified semantic provider fields;
-5. update explicit SQLite row IDs inside bounded transactions;
-6. leave unrelated records, cloud sessions, titles, content and project placement untouched;
-7. validate and commit the manifest only after all stores agree.
+获得用户明确确认后：
 
-An equal-length byte patch is not a general migration technique. If an old provider name and `openai` differ in byte length, use a stopped-writer structural rewrite with atomic replacement and verified backups. Even when lengths match, prefer the structural stopped-writer path unless a narrowly tested recovery case requires byte-level editing.
+1. 如有桌面提醒程序，先写入有期限的历史维护标记；
+2. 完全退出 Desktop、CLI 和所有可能追加状态的辅助程序；
+3. 为 JSONL 建立内容寻址备份，为 SQLite 使用 WAL 感知备份；
+4. 写入持久清单：线程／记录身份、旧值、目标 `openai`、哈希和回滚数据，但不含正文；
+5. 解析 JSONL，只改已确认的 provider 字段；
+6. 在有界事务里更新明确的 SQLite 行编号；
+7. 不动云端会话、标题、内容、项目归属和其他记录；
+8. 全部存储一致且验证通过后才提交清单，并清除维护标记；异常退出时让标记自动过期。
 
-The live user-level configuration must also keep `model_provider = "openai"` in every official and API-compatible profile so future sessions do not reintroduce mixed values. Provider normalization does not repair generic or type-incompatible response-item IDs; evaluate and repair those separately.
+等长字节修改不是通用迁移方案。旧值和 `openai` 长度不同必须停写后结构化重写；即使等长，默认也应采用停写路径。只有确实无法停止追加者、偏移和编码都已证明且具备字节级日志与收敛扫描时，才考虑在线定点修复。
 
-### Provider acceptance checks
+实时用户级配置也必须让所有官方／API 兼容档案继续写 `model_provider = "openai"`，否则以后会重新产生混合值。
 
-Provider normalization succeeds only when:
+provider 统一不修复通用或类型不兼容的响应项目编号，后者必须单独判断。
 
-- every targeted JSONL line parses and every intended semantic provider field is `openai`;
-- each targeted SQLite row is `openai`, database `quick_check` or the stronger chosen integrity check passes, and manifest counts reconcile;
-- no out-of-scope cloud or unrelated local record changed;
-- a new official session and a new API-compatible session both record `openai`;
-- after a full restart, representative old sessions open and continue in both modes;
-- the named manifest can roll back a fixture without overwriting newer activity.
+## 安全修改协议
 
-## Safe mutation protocol
+默认顺序：
 
-Default protocol:
+1. 停止全部写入者；
+2. 获取修复锁；
+3. 盘点目标文件和数据库；
+4. 创建内容寻址备份；
+5. SQLite 使用自身备份接口；
+6. 记录文件身份、哈希和预期变更；
+7. 结构化解析 JSONL，遇到影响判断的损坏行就停止；
+8. 只做最小语义修改；
+9. SQLite 使用有界事务；
+10. 重新解析每行 JSONL；
+11. 运行 SQLite 完整性检查；
+12. 验证引用关系和目标接口兼容；
+13. 保存脱敏清单和历史指纹。
 
-1. fully stop Desktop and CLI writers;
-2. acquire a repair lock;
-3. inventory all targeted files and databases;
-4. create content-addressed backups;
-5. use SQLite's backup API for live-format databases;
-6. record file identity, hash and intended record changes;
-7. parse JSONL structurally and fail on malformed lines;
-8. apply the minimum semantic changes;
-9. update SQLite inside a bounded transaction;
-10. parse every resulting JSONL line;
-11. run SQLite integrity checks;
-12. verify relationship invariants and target compatibility;
-13. save a redacted repair manifest and history fingerprint.
+不得用旧完整文件覆盖后来追加的新历史。回滚前先确认目标记录周围内容仍与清单一致，只撤销记录过的字段。
 
-An equal-length in-place byte edit can be useful when active appenders cannot be stopped and the exact bytes, encoding and file identity have been proven. It remains an exceptional technique. It needs a byte-level journal and convergence scans because an in-memory task may append the old value again.
+## 把准备与切换分开
 
-Never restore an entire old JSONL file over a newer active file. Roll back only journaled changes after confirming the surrounding record still matches.
+建议命令含义：
 
-## Separate preparation from switching
+- `scan`：只读报告；
+- `prepare`：停写修复、验证并生成指纹；
+- `rollback`：撤销指定清单；
+- `switch`：快速核对指纹，再切配置与认证。
 
-Full history inspection can be expensive. Provide commands with distinct meanings:
+历史在准备后变化时，官方模式切换必须在修改配置和认证之前停止。
 
-- scan: read-only report;
-- prepare: stopped-writer repair plus validation and fingerprint;
-- rollback: reverse one named repair manifest;
-- switch: fast fingerprint check, then configuration and auth transition.
+## 验收条件
 
-If the history changes after preparation, the fingerprint gate should stop an official-mode transition before credentials or configuration are touched.
-
-## Acceptance criteria
-
-History is prepared only when:
-
-- every JSONL line parses;
-- all targeted semantic identifiers satisfy the tested rules;
-- tool relationships are coherent;
-- SQLite integrity checks pass;
-- provider metadata matches the intended discovery strategy;
-- every targeted historical provider value and every newly created local session use the verified `openai` identity;
-- backups and the repair manifest are readable;
-- rollback has been tested against a fixture;
-- the target Codex build can open and continue representative old conversations.
+只有同时满足以下条件才算准备完成：JSONL 全部可解析、目标语义编号符合实测规则、工具关系一致、SQLite 完整性通过、所有目标 provider 和以后新会话都是已验证的 `openai`、备份与清单可读、合成样例能回滚、目标 Codex 版本能打开并继续代表性旧会话，而且任何云端或范围外记录均未改变。

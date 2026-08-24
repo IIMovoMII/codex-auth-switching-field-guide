@@ -1,84 +1,86 @@
-# Network diagnostics
+# 网络诊断
 
-Treat a connection failure as a layered problem. Similar UI messages can come from different layers.
+> English: [network-diagnostics.en.md](network-diagnostics.en.md)
 
-## Diagnostic layers
+连接失败必须分层诊断。界面上相似的“重新连接”可能来自完全不同的环节。
 
-1. name resolution;
-2. TCP reachability;
-3. TLS certificate and hostname validation;
-4. Windows proxy selection;
-5. HTTPS request routing;
-6. WebSocket upgrade routing;
-7. API path construction;
-8. authentication;
-9. model availability;
-10. application-level response compatibility.
+## 诊断层级
 
-Test one layer at a time with the same environment the Codex process actually inherits.
+1. 域名解析；
+2. TCP 连通；
+3. TLS 证书和主机名；
+4. Windows 代理选择；
+5. HTTPS 请求路由；
+6. WebSocket 升级路由；
+7. API 路径拼接；
+8. 认证；
+9. 模型可用性；
+10. 应用层响应兼容。
 
-## Common symptoms
+每层都要使用新启动 Codex 实际继承的环境，不能用浏览器能访问代替客户端验证。
 
-| Symptom | Likely layer | First checks |
+## 常见现象
+
+| 现象 | 可能环节 | 首要检查 |
 | --- | --- | --- |
-| Request timeout | proxy, firewall, route or WebSocket handshake | process proxy inheritance, direct HTTPS, upgrade request |
-| 404 on a Responses path | base-path duplication or relay feature gap | effective base URL and exact route |
-| 401 or 403 | credential type, scope or wrong route | active auth type without printing the token |
-| Model not found | profile/model mismatch | provider model catalog and selected ID |
-| Reconnect count on first turn, then success | WebSocket attempt followed by HTTPS fallback | upgrade support and timeout duration |
-| Every route reaches the relay in official mode | stale endpoint override | effective merged config |
-| Browser works but Codex fails | different proxy stack | Windows system proxy and process environment |
+| 请求超时 | 代理、防火墙、路由或 WebSocket 握手 | 进程代理、直接 HTTPS、升级请求 |
+| Responses 路径返回 404 | 版本路径重复或中转缺少功能 | 生效地址和精确路径 |
+| 401／403 | 凭据类型、权限或路线错误 | 脱敏后的认证类型与路线 |
+| 找不到模型 | 档案模型与供应商不一致 | 模型目录和选择编号 |
+| 每个任务第一轮重连后成功 | WebSocket 尝试后回退 HTTPS | 升级支持和超时时长 |
+| 官方模式仍全部走中转 | 残留接口覆盖 | 合并后的生效配置 |
+| 浏览器可用但 Codex 不通 | 代理栈不同 | Windows 系统代理和进程环境 |
 
-## HTTPS and WebSocket are separate capabilities
+## HTTPS 与 WebSocket 是两种能力
 
-A provider can implement the Responses HTTPS endpoint without implementing the Responses WebSocket upgrade. A successful HTTPS probe therefore does not prove WebSocket support.
+中转实现 Responses HTTPS，不代表实现 Responses WebSocket。HTTPS 探针成功不能证明升级路径存在。
 
-Probe:
+分别检查：精确 HTTPS 路径、WebSocket 协议和路径、代理是否保留升级头、服务器是否返回升级响应、客户端多久后回退。
 
-- the exact HTTPS request path;
-- the exact WebSocket scheme and path;
-- whether required headers survive the proxy;
-- whether the server returns an upgrade response;
-- whether the client times out before falling back.
+缺失 WebSocket 是接口能力问题，不能通过篡改 provider 名称或对话历史“修好”。如果当前 Codex 版本支持关闭该传输，只能在实测后把相应字段纳入中转档案；否则应接受回退延迟或更换支持升级的接口。
 
-Do not work around a missing relay capability by mislabeling the provider or mutating conversation history.
+## 接口地址拼接
 
-## Base URL composition
+先确认配置地址是否已经包含 API 版本段。客户端可能自动附加 Responses 路径，而中转又要求另一种基准地址；重复或缺失一段都会产生看似干净的 404。
 
-Clarify whether the configured base URL already contains the API version segment. A client may append a Responses route, while a relay expects a different base convention. A duplicated or omitted segment often produces a clean 404 that looks like a server outage.
+日志最多记录经过脱敏的主机和路径，不得保留查询参数、凭据或签名片段。
 
-Log only the host and normalized path when safe. Strip query parameters, credentials and signed fragments.
+## Windows 代理
 
-## Windows proxy behavior
+“VPN 已打开”信息不足。还要确认：
 
-“VPN enabled” is not enough information. Determine:
+- TUN 还是规则模式；
+- Windows 系统代理是否开启；
+- Codex 继承的代理环境变量；
+- 绕过规则；
+- DNS 路线；
+- WebSocket 与 HTTPS 是否走同一路径；
+- 本版本是否支持并实际遵守系统代理开关。
 
-- TUN mode versus rule mode;
-- Windows system proxy state;
-- environment proxy variables inherited by Codex;
-- bypass rules;
-- DNS behavior;
-- whether WebSocket upgrades follow the same route as HTTPS;
-- whether the current Codex build supports and honors a system-proxy feature flag.
+`respect_system_proxy` 等字段可能随版本变化。修改后必须由全新 Codex 进程验证，不能写成永久事实。官方和 API 档案可以有不同代理策略，但只有本机确实需要且经过测试时才由切换器管理。
 
-A feature such as <code>respect_system_proxy</code> may be development-stage or version-sensitive. Test it with a new Codex process after changing configuration. Never describe it as permanent or universally available.
+## 最小探针顺序
 
-Official and API profiles may need different proxy policies. Make proxy policy an owned profile field only when the target environment actually requires it.
+1. 解析主机名；
+2. 不带凭据建立 TLS；
+3. 发最小认证 HTTPS 请求；
+4. 单独尝试 Responses WebSocket 升级；
+5. 验证目标模型；
+6. 在与 Codex 相同的启动环境重做；
+7. 对比官方和 API 档案。
 
-## A minimal probe sequence
+只记录时间、状态类别和脱敏路线，不记录正文或认证头。
 
-1. Resolve the hostname.
-2. Establish TLS without sending credentials.
-3. Send a minimal authenticated HTTPS request.
-4. Attempt the Responses WebSocket upgrade separately.
-5. Request or validate the selected model.
-6. repeat from the same process environment used to launch Codex.
-7. compare official and API profiles.
+## 如何解释“第一轮 5/5”
 
-Record timestamps, status class and sanitized route. Do not record request bodies or authorization headers.
+如果每个任务第一轮都经历重复 WebSocket 重连，之后在该任务中变快，重点检查“每任务传输初始化＋HTTPS 回退缓存”。两种认证模式都超时时，共同代理路线比 provider 元数据更可疑；只有中转返回 404 时，优先检查中转升级能力与地址拼接。
 
-## Interpreting reconnect behavior
+诊断结论要落到明确动作：
 
-If the first turn in each task waits through repeated WebSocket reconnects and later turns are faster, investigate per-task transport initialization and fallback caching. If both official and API modes show timeouts, the shared proxy path is more suspicious than the provider metadata. If only the relay returns 404, inspect relay route support and base URL composition.
+- 路线／路径错误：修正档案字段后重启并复测；
+- 凭据错误：不改历史，恢复上一可用认证或重新登录；
+- 模型不可用：让用户重新选择该档案模型；
+- WebSocket 不支持：采用已验证的关闭／回退策略，或说明无法消除首次延迟；
+- 原因仍不明：保留上一可用档案，输出脱敏分层结果，不做猜测性修改。
 
-The switcher should manage verified profile fields. It should not hide a transport failure by suppressing all diagnostics.
+切换器只管理已验证字段，不能为了让界面安静而吞掉诊断信息。

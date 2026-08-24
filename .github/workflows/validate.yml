@@ -1,4 +1,4 @@
-name: Validate field guide
+name: 校验经验包
 
 on:
   push:
@@ -9,15 +9,16 @@ permissions:
 
 jobs:
   validate:
+    name: 结构、链接与隐私校验
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 安装 Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - name: Validate structure, links and privacy patterns
+      - name: 校验结构、语言、链接与隐私
         run: python scripts/validate_pack.py

@@ -1,83 +1,73 @@
 ---
 name: codex-auth-switching-field-guide
-description: Use when designing, auditing, or repairing a machine-specific Windows workflow that switches Codex between official OAuth accounts and API-compatible endpoints while preserving live configuration, credentials, plugins, MCP, skills, hooks, and local conversation compatibility.
+description: 当需要在 Windows 上为 Codex 设计、审查或修复官方 OAuth 账号与 API 兼容接口切换流程，并保留实时配置、凭据、插件、MCP、技能、钩子及本地对话兼容性时使用。
 ---
 
-# Codex Auth Switching Field Guide
+# Codex 账号与接口切换经验指南
 
-Build a bespoke solution for the current machine. Do not install or copy a universal switcher.
+为当前电脑构建有针对性的方案，不安装或照搬所谓“通用切换器”。
 
-## Applicable scenarios
+> 英文次选版本：[SKILL.en.md](SKILL.en.md)
 
-Use this guide when the machine needs any combination of official OAuth accounts, API-compatible endpoints, provider-specific models, preserved live Codex configuration, cross-mode local history, or transport/proxy diagnosis.
+## 适用场景
 
-Do not treat it as a cloud-chat migration method, an account-policy bypass, or a portable credential-sharing mechanism.
+当用户需要组合使用官方 OAuth 账号、API 兼容接口、不同供应商模型、实时配置保留、跨模式本地历史或代理／传输诊断时使用本指南。
 
-## One-prompt kickoff
+本指南不用于迁移云端 ChatGPT 会话、绕过账号规则或跨用户分享凭据。
 
-When the user arrives through the README's one-prompt deployment sentence, treat it as authorization for read-only discovery and construction of a local solution. It is not blanket authorization to expose credentials, install third-party software, switch the live account, or mutate conversation history. Pause immediately before those sensitive actions when they become necessary.
+## 一句话部署的权限边界
 
-## Workflow
+用户从首页复制“一句话部署”时，只代表允许只读盘点并为本机构建方案；这不等于允许暴露凭据、静默安装第三方程序、切换当前账号或修改对话历史。真正需要执行这些敏感操作时，必须在写入前单独说明并获得确认。
 
-1. Start with read-only discovery. Identify the Codex version, active processes, configuration source, credential store, active route, model, history stores, proxy behavior, requested profile set, and external config managers such as CC Switch.
-2. Report state without reading secret values into the conversation. Show credential type and consistency, not token contents.
-3. Establish one configuration writer. If CC Switch or another manager projects profiles into the same live file, explain the ownership conflict and require the user to choose one tool before any mutation.
-4. Before the first write, ask the user to save one complete `config.toml` that has passed a real request after a fresh Codex restart. Do not silently create an unbounded backup archive.
-5. Define the switcher's owned fields. Preserve every unrelated live setting, including plugins, MCP servers, skills, hooks, permissions and project configuration.
-6. Model route, credential and history compatibility as separate state domains.
-7. Design first use from the detected starting state. Handle "no official login yet" and "no API/relay configuration yet" explicitly; never manufacture either state.
-8. Collect endpoint and model choices separately from secrets. Provide a local masked or OS-supported secret-entry path and never ask the user to paste a key into chat.
-9. When requested, model multiple relays as profiles containing endpoint, protected credential reference, model and proxy policy—not full copied configs—so the user can stop using CC Switch for Codex.
-10. Prove one stable provider identity for new conversations. For the built-in OpenAI route plus top-level endpoint-override architecture, use `model_provider = "openai"` in both official and API-compatible profiles only after the installed build and endpoint pass the probe; never redefine the reserved built-in `openai` provider table.
-11. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
-12. Before the first cross-mode activation, inventory provider values across active and archived local JSONL and every relevant SQLite store. Exclude cloud ChatGPT Work/Chat records.
-13. Require a stopped-writer barrier before changing credentials or history. With explicit user approval, normalize every proven semantic local provider field to `openai`, using database-aware backups and a field-level rollback manifest. Do not assume the first JSONL line is the only copy.
-14. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
-15. Keep full history preparation separate from ordinary switching. Treat provider normalization and response-item compatibility as separate rules, then gate official-mode activation with a cheap fingerprint of the prepared history.
-16. Provide an offline config-recovery path for empty, malformed or generic-template files. If Codex cannot converse, allow a local script or another agent to reconstruct from the user's known-good config without exposing credentials.
-17. Validate effective behavior after the relevant restart: route, authentication type, model availability, proxy path, transport, new-session provider metadata, representative old-conversation resume in both modes, rollback and preservation of unrelated configuration.
-18. After any Codex upgrade, rerun discovery and the transport/history probes before trusting the `openai` normalization contract again.
+## 工作流程
 
-## Non-negotiable safety rules
+1. 先做只读盘点：确认 Codex 版本、进程、用户级配置、原生配置档案、认证存储、当前路线、模型、历史存储、代理行为、目标档案，以及 CC Switch 等外部配置管理器。
+2. 只报告认证类型和一致性，不把密钥、令牌或完整认证文件输出到对话。
+3. 确立唯一配置写入者；如果多个工具都会投射或重写同一个实时 `config.toml`，先让用户选择其中一个。
+4. 第一次写入前，提醒用户自行保存一份已经在全新 Codex 进程中完成真实请求的完整 `config.toml`；不要静默积累无限备份。
+5. 明确切换器负责的字段，只修改路线、模型和经过当前版本验证的代理／传输字段；插件、MCP、技能、钩子、权限、项目和未知新字段继续以实时配置为准。
+6. 把路线、认证和历史兼容拆成三个状态域，不能只换其中一个就宣布成功。
+7. 根据实测起点设计首次使用：明确处理“从未官方登录”和“从未配置 API／中转”两种情况，不能制造不存在的档案。
+8. 接口地址和模型可以先询问；密钥必须通过本地遮罩输入或操作系统支持的入口收集，不能要求用户粘贴进聊天。
+9. 用户需要多个中转站时，每个档案保存地址、受保护凭据引用、模型和代理策略，不保存整份配置，从而可以不再让 CC Switch 管理 Codex。
+10. 先在已安装版本和目标接口上证明共同 provider 身份。只有验证通过，官方和 API 兼容档案才共同使用 `model_provider = "openai"`；不得用 `[model_providers.openai]` 重定义内置名称。
+11. 把首次初始化实现为可重复恢复的检查点流程；每次必须重启 Codex 前先保存非敏感进度，再由全新进程验证实际生效状态。
+12. 首次跨模式前，盘点当前及归档 JSONL 与全部相关 SQLite 的 provider 值，排除云端 ChatGPT Work／Chat 记录。
+13. 只有在用户确认且所有写入者退出后，才能按结构统一已确认的本地 provider 字段；JSONL 使用内容备份和变更清单，SQLite 使用数据库感知备份，不能假设只改第一行。
+14. 多文件切换先写事务日志，再启用目标配置和凭据；闲置凭据使用操作系统保护。
+15. 完整历史准备独立于普通切换；provider 统一和响应项目编号兼容使用两套规则，普通切换只检查便宜的历史指纹。
+16. 为配置清空、语法损坏或通用模板化提供离线恢复路线；Codex 无法对话时，应允许本地脚本或另一个编程智能体在不读取凭据值的前提下修复。
+17. 在相关重启后验证真实路线、认证类型、模型、代理、传输、新会话 provider、代表性旧会话续聊、回滚和无关配置保留。
+18. Codex 升级后重新盘点并复测路线、传输和历史契约，不能直接沿用旧结论。
 
-- Never expose, log, commit or ask a model to inspect credential values.
-- Never mark a newly created profile ready from pre-restart file inspection alone.
-- Never replace an entire live configuration merely to change auth mode.
-- Never let two profile managers alternate ownership of the same live `config.toml`.
-- Never claim that a deleted config value was recovered when it was inferred or recreated.
-- Never rewrite active JSONL history or raw-copy a live WAL database.
-- Never normalize provider values with global text replacement or assume all provider names have equal byte length.
-- Never change cloud ChatGPT Work/Chat records as though they were local rollout files.
-- Never rename generic response identifiers blindly. Classify records by semantic type.
-- Never fabricate a reasoning identifier when the protected reasoning payload required by the target endpoint is unavailable.
-- Preserve tool-call and tool-result pairing.
-- Abort before the first write when preflight or compatibility gates fail.
-- Roll back only journaled fields or records; do not overwrite newer user activity.
+## 不可违反的安全规则
 
-## Read references as needed
+- 不得显示、记录、提交或让模型读取凭据值。
+- 不得仅凭重启前文件正确就把新档案标为可用。
+- 不得为了切换认证而替换整份实时配置。
+- 不得让两个档案管理器轮流拥有同一个实时 `config.toml`。
+- 不得把推断或重建的值伪称为“恢复出的原值”。
+- 不得在 JSONL 仍被写入时整体重写，也不得直接复制正在使用的 WAL 数据库作为完整备份。
+- 不得全局替换 provider，也不得假设旧名称与 `openai` 等长。
+- 不得把云端 Work／Chat 记录当成本地 rollout 修改。
+- 不得按字符串前缀盲目改响应项目编号；必须按语义类型分类。
+- 缺少目标接口要求的受保护推理内容时，不得伪造 reasoning 项。
+- 必须保留工具调用与结果的配对关系。
+- 预检查或兼容门禁失败时，在第一次写入前停止。
+- 回滚只能撤销清单中记录的内容，不能覆盖用户后来产生的新活动。
 
-- Start with [discovery](references/discovery.md).
-- Read [architecture](references/architecture.md) before implementation.
-- Read [first use and restart checkpoints](references/first-use-bootstrap.md) whenever either auth mode is absent or a setting needs a fresh Codex process to verify.
-- Read [config recovery and external writers](references/config-recovery.md) when CC Switch or another manager is present, configuration fields disappeared, or Codex cannot converse.
-- Read [optional multi-relay profiles](references/multi-relay-profiles.md) when the user wants several relay providers without CC Switch.
-- Read [history compatibility](references/history-compatibility.md) whenever existing conversations must survive a route or auth change.
-- Read [network diagnostics](references/network-diagnostics.md) for reconnects, timeouts, proxy behavior or endpoint differences.
-- Read [safety and rollback](references/safety-and-rollback.md) before any mutation.
-- Finish with [validation](references/validation.md).
+## 按需阅读
 
-## Deliverable
+- 从[环境盘点](references/discovery.md)开始。
+- 实施前阅读[总体设计](references/architecture.md)。
+- 缺少任一认证模式或必须重启验证时，阅读[首次使用与重启检查点](references/first-use-bootstrap.md)。
+- 存在 CC Switch、配置字段消失或 Codex 已无法对话时，阅读[配置恢复与外部写入者](references/config-recovery.md)。
+- 用户需要多个中转站且不再使用 CC Switch 时，阅读[多中转档案](references/multi-relay-profiles.md)。
+- 旧对话必须跨模式续聊时，阅读[历史兼容](references/history-compatibility.md)。
+- 出现重连、超时、代理或接口差异时，阅读[网络诊断](references/network-diagnostics.md)。
+- 任何写入前阅读[安全与回滚](references/safety-and-rollback.md)。
+- 最后使用[验证清单](references/validation.md)。
 
-Produce a machine-specific design or implementation with:
+## 交付物
 
-- a state inventory;
-- explicit field ownership;
-- a first-use flow;
-- one-writer ownership and offline config-recovery instructions;
-- optional multi-relay profile behavior when requested;
-- secure credential handling;
-- transaction and rollback behavior;
-- a separate history-preparation command;
-- a redacted before/after inventory proving historical and future local provider metadata use the verified stable identity;
-- a versioned validation report;
-- known limits and recovery instructions.
+最终方案至少应包含：脱敏状态盘点、字段所有权、首次使用流程、单写入者规则、离线配置恢复、可选的多中转行为、安全凭据处理、切换事务与回滚、独立历史准备命令、新旧本地 provider 的脱敏前后统计、版本化验证报告，以及已知限制和恢复说明。

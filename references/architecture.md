@@ -1,167 +1,145 @@
-# Architecture
+# 总体设计
 
-The safest design treats switching as a transaction across several independent state domains.
+> English: [architecture.en.md](architecture.en.md)
 
-## State domains
+最稳妥的结构，是把切换看成多个相互独立状态域之间的一次事务。
 
-### Live configuration
+## 状态域
 
-This remains the source of truth for everything that evolves during normal Codex use. The switcher reads it at switch time and changes only owned fields.
+### 实时配置
 
-Exactly one tool may own routing changes to this file. If CC Switch or another profile manager also projects saved profiles into the live file, the user must choose one owner and stop the other before implementation continues. See [config recovery and external writers](config-recovery.md).
+实时 `config.toml` 是日常变化内容的唯一依据。切换时先读取当前文件，只修改明确归切换器负责的字段。
 
-Typical owned fields may include:
+同一个文件只能有一个路线写入者。如果 CC Switch 或其他工具也会把档案整段投射回实时配置，用户必须在实施前选择唯一管理器并停止另一个。详见[配置恢复与外部写入者](config-recovery.md)。
 
-- provider identity;
-- endpoint override;
-- model selection;
-- one transport or proxy feature flag.
+常见自管字段可能包括：
 
-The exact list must come from discovery. A field should not be owned merely because it appeared in one working example.
+- provider 身份；
+- 接口地址覆盖；
+- 模型；
+- 一个经过当前版本实测的代理或传输开关。
 
-### Active credential
+具体清单必须来自盘点，不能因为某字段在一台电脑上出现过就擅自接管。
 
-Codex needs its live credential in the format and location supported by the current build. Do not encrypt or reshape the active document if Codex cannot read that form.
+### 当前认证
 
-### Inactive credential snapshots
+Codex 当前使用的凭据必须保持已安装版本能够读取的格式和位置。如果 Codex 不认识加密后的活动文件，就不能为了“更安全”而擅自改变格式。
 
-Inactive profiles belong in an OS-protected local store. Each snapshot should include metadata such as profile ID, auth type, creation time and a hash of the encrypted blob. The metadata must not contain secret values.
+### 闲置认证快照
 
-On Windows, DPAPI is one reasonable local primitive. It normally binds a protected blob to a Windows identity, and sometimes to the machine, so it is not a portable backup strategy.
+未启用的档案使用操作系统保护的本地存储。每份快照可以记录档案编号、认证类型、创建时间、密文哈希和最后验证版本，但不能记录秘密值。
 
-### Profile manifest
+Windows DPAPI 是一种可选方案，通常绑定当前 Windows 用户，有时还绑定电脑，因此它不是跨设备备份。
 
-A profile is intent, not a full copied config:
+### 档案清单
+
+档案描述意图，不保存整份配置：
 
 ~~~text
-profile_id
-display_name
-route_kind
-endpoint_reference
-credential_snapshot_reference
-preferred_model
-proxy_policy
-last_validated_codex_version
+档案编号
+显示名称
+路线类型
+接口地址引用
+认证快照引用
+首选模型
+候选模型
+代理策略
+最后验证的 Codex 版本
+就绪状态
 ~~~
 
-Several API-compatible relays may each have a profile with its own endpoint, credential reference, model and proxy policy. This removes the need to keep CC Switch as a second Codex config owner. See [optional multi-relay profiles](multi-relay-profiles.md).
+多个 API 兼容中转可以分别拥有地址、凭据、模型和代理策略，而插件等共同配置仍只存在于实时文件。详见[多中转档案](multi-relay-profiles.md)。
 
-An endpoint may be stored as ordinary configuration if it contains no credentials. Tokens and signed URLs belong in the protected credential boundary.
+### 历史兼容门禁
 
-### History compatibility gate
+保存一次已经明确检查和准备过的历史指纹，包括：范围、文件大小和修改时间、稳定文件身份、变更清单哈希、修复工具版本和目标兼容规则。不得存对话正文。
 
-This stores a fingerprint of the history state that was explicitly inspected and prepared for a target mode. It should record:
+### 事务日志
 
-- scope of files and databases;
-- sizes and modification times;
-- stable identities where available;
-- manifest hash;
-- repair-tool version;
-- target compatibility rules.
+日志记录切换前状态、目标状态、已完成阶段、字段级变更和受保护回滚材料。第一次写入前必须落盘并刷新。
 
-It must not contain conversation text.
+## 补丁式合并配置
 
-### Transaction journal
+一次切换应当：
 
-The journal describes the previous and intended states, stages completed, field-level changes and rollback material. It is written durably before the first mutation.
+1. 解析当前实时 TOML；
+2. 验证它仍与预检查时一致；
+3. 只删除或设置自管字段；
+4. 保留未知表、注释和用户后来新增的设置；
+5. 写入同卷临时文件；
+6. 再次解析临时文件；
+7. 在当前 Windows 语义下原子替换；
+8. 验证最终生效配置。
 
-## Surgical configuration merge
+如果所用解析器不能保留注释，应使用能够保留语法结构的编辑器，或经过测试的窄范围补丁器，不能退化成全局字符串替换。
 
-At switch time:
+## 区分 provider、账号、凭据和模型
 
-1. parse the current live TOML;
-2. verify it still matches preflight expectations;
-3. remove or set only owned fields;
-4. preserve unknown tables, comments and unrelated additions when the chosen TOML library permits;
-5. serialize to a sibling temporary file;
-6. parse the temporary file again;
-7. replace the live file atomically where Windows semantics allow;
-8. verify the resulting effective configuration.
+- provider 描述路由语义；
+- 账号描述身份；
+- 凭据快照使某个身份可用；
+- 模型属于某个路线档案。
 
-If comment preservation matters and the parser cannot round-trip comments, use a syntax-aware editor or an explicitly tested narrow patcher. Do not fall back to global string replacement.
+多个官方账号可以共享官方路线，但需要各自独立的 OAuth 状态。多个中转也可以共享同一个 provider 身份，却使用不同地址、API Key 和模型。
 
-## Profiles, accounts and providers
-
-Keep these concepts distinct:
-
-- A provider describes routing semantics.
-- An account describes an identity.
-- A credential snapshot enables an account or API identity.
-- A model choice may belong to a provider profile.
-
-Several official accounts can share the same official route but require different protected OAuth snapshots. Several API providers may use the same provider identity but require different base URLs, keys and model choices.
-
-For a current Codex build that passes the compatibility probe, the preferred shared identity is the built-in `openai` provider:
+当前版本通过兼容探针时，建议共同使用内置身份：
 
 ~~~toml
 model_provider = "openai"
 ~~~
 
-Official profiles omit `openai_base_url`; API-compatible profiles set that top-level override. Do not define `[model_providers.openai]`, because the built-in identity is reserved. This contract must govern both the live configuration that creates future sessions and the separate history-preparation operation that normalizes old local session metadata. A profile must not silently choose a new provider label merely because its endpoint or model differs.
+官方档案移除顶层 `openai_base_url`；API 兼容档案添加该覆盖。不要定义 `[model_providers.openai]`，因为这是保留的内置名称。
 
-This separation allows a user interface to show:
+Codex 也支持用户级 `*.config.toml` 原生档案。盘点时应评估它们是否适合当前 CLI／Desktop，但不能假设选中配置档案会自动切换 OAuth 与 API Key；认证仍是独立状态域。
 
-~~~text
-Official
-  - Personal account
-  - Work account
+## 首次使用
 
-API-compatible
-  - Provider A / model family A
-  - Provider B / model family B
-~~~
+任何首次使用流程都是可跨重启的多阶段工作，详见[首次使用与重启检查点](first-use-bootstrap.md)。
 
-The displayed hierarchy does not require swapping full configs.
+### 当前是官方模式
 
-## First-use protocol
+1. 验证路线和认证确实属于官方。
+2. 登记当前官方档案并保护快照。
+3. 让用户有意配置一个 API 模式。
+4. 真实请求成功后才保存 API 档案。
+5. 通过正常事务恢复用户要求的最终模式。
 
-Every first-use flow below is a durable multi-stage workflow. Persist a checkpoint before each required shutdown or restart, and do not mark a profile ready until a fresh Codex process has loaded and passed the expected probes. See [first use and restart checkpoints](first-use-bootstrap.md).
+### 当前是 API 模式
 
-### Machine currently in official mode
+流程对称。先保护已验证 API 状态，再移除中转覆盖，让用户真正完成官方 OAuth。登录后必须等认证存储稳定并由新进程验证，不能提前捕获。
 
-1. Validate that the route and credential are genuinely official.
-2. Register the current state as the first official profile.
-3. Protect a snapshot without exposing it.
-4. Ask the user to intentionally configure and test an API mode.
-5. Capture the API state only after a successful minimal request.
-6. Restore the requested final mode through the normal transaction engine.
+首次启用官方前还要完成只读历史 provider 盘点；如果发现混合值，必须把历史准备作为单独、经确认的停写操作，不能藏进认证切换。
 
-If the API endpoint or key does not yet exist, collect endpoint/model intent and use a local secret-entry path before the staged restart. Do not ask for the key in chat.
+### 当前状态矛盾
 
-### Machine currently in API mode
+例如官方路线配 API Key，或中转地址配不相干的 OAuth。不能把这种状态保存成有效档案；先说明冲突并让用户选择恢复方向。
 
-Use the symmetric flow. Register and protect the known-good API state, then guide the user through one official login. The login must occur after removing route overrides that would send the OAuth-backed request to a relay.
+## 正式切换事务
 
-The OAuth result must be inspected only after the login process and a subsequent clean shutdown have stabilized the credential store.
+1. 预检查来源和目标，并在要求用户关闭 Codex **之前** 写入有期限的维护标记；
+2. 确认 Codex 及竞争配置管理器都已退出；
+3. 获取独占锁，重新验证来源状态、目标档案和配置文件身份；
+4. 在需要时检查目标历史门禁；
+5. 写入并刷新恢复日志；
+6. 把当前稳定凭据保存回来源档案；
+7. 暂存目标配置；
+8. 暂存并启用目标凭据；
+9. 验证权限、语法和路线／认证／模型一致性；
+10. 提交日志；
+11. 明确告诉用户需要完全重启 Codex，并由新进程做最终验证；
+12. 验证完成或回滚后清除维护标记；程序异常时由过期时间保证它不会永久屏蔽提醒。
 
-Before the first official activation, run the read-only local-history provider inventory. If it finds mixed or non-`openai` provider metadata and the shared-identity probe has passed, pause for explicit approval and complete the separate stopped-writer history preparation before activating OAuth. Do not hide that repair inside the credential transaction.
+任一阶段失败，都按日志恢复并再次验证。界面还能打开，不代表可以接受半切换状态。
 
-### Inconsistent machine
+## 档案的增删改闭环
 
-Examples include an official route with an API key, or an API endpoint with an OAuth snapshot intended for another route. Do not capture this as a valid profile. Explain the conflict and require the user to choose a recovery direction.
+- **新增：** 未通过重启后真实请求前，始终标为“未就绪”。
+- **更新：** 地址、模型或代理改变后，使旧验证失效并重新走探针。
+- **删除：** 先确认档案未处于活动状态，再删除受保护凭据和非敏感元数据；不能顺手删除实时配置中的无关字段。
+- **认证过期：** 保持当前可用档案，要求重新登录／输入密钥，成功后再替换旧快照。
 
-## Switch transaction
+## 保持共同配置持续更新
 
-A robust transition follows these stages:
+每次切换都从实时文件开始，因此昨天安装的插件、今天修改的 MCP 和未来出现的新字段都会保留。档案只贡献自管字段。
 
-1. acquire an exclusive switch lock;
-2. confirm all Codex writers and competing config managers are stopped;
-3. validate source state and target profile;
-4. check the target history gate when required;
-5. write the recovery journal;
-6. preserve the current credential as its source profile snapshot;
-7. stage the new live configuration;
-8. stage and activate the target credential;
-9. verify file permissions and parseability;
-10. validate route/auth/model consistency;
-11. commit the journal;
-12. emit a short maintenance marker for cooperating monitors;
-13. instruct the user to reopen Codex.
-
-If any stage fails, rollback should use the journal and verify the restored state. Never continue from a half-applied state merely because the UI still opens.
-
-## Keeping live configuration current
-
-Because each switch begins from the live file, a plugin installed yesterday or an MCP server edited today survives. Profile data contributes only owned values. This is the central reason to prefer a merge-based switcher over whole-file snapshots.
-
-When the owned-field schema changes, migrate the manifest explicitly and retain the previous schema version for rollback.
+自管字段结构变化时，显式迁移档案清单并保留可验证的回滚版本，不能静默解释旧数据。

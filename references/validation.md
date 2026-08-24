@@ -1,161 +1,79 @@
-# Validation
+# 验证与闭环清单
 
-A switcher is trustworthy only when behavior, preservation and recovery are tested together.
+[English](validation.en.md)
 
-## Static invariants
+切换器只有在“能切换、保留无关配置、失败可恢复”三件事同时成立时才算完成。
 
-Verify after every build:
+## 静态检查
 
-- all profile identifiers are unique;
-- no secret value is stored in source or logs;
-- all owned fields are declared in one schema;
-- configuration output parses;
-- credential snapshots are protected;
-- file permissions are restricted;
-- transaction schemas are versioned;
-- history manifests contain no conversation text.
+- 档案编号唯一，档案格式有版本号；
+- 源码、日志和测试夹具不含秘密；
+- 切换器负责的字段只有一份清单；
+- 暂存和最终 TOML 都能解析；
+- 闲置凭据受到当前用户保护；
+- 历史清单不含对话正文；
+- 默认中文入口及英文次选入口的链接全部有效。
 
-## Configuration preservation tests
+## 配置保留
 
-Create a fixture with representative unrelated settings:
+准备包含插件、MCP、Skills、钩子、权限、项目、注释和未知字段的合成配置。遍历所有档案后，断言只有声明归切换器管理的字段发生变化。切换期间新增一个无关配置，再切回原档案，它也必须保留。
 
-- plugin entries;
-- MCP servers;
-- skills;
-- hooks;
-- permissions;
-- projects;
-- comments and unknown future keys.
+还要注入空文件、错误 TOML、过小的通用模板、缺失子表、未定义的 provider 和外部管理器并发写入。普通切换必须在碰凭据前停止，并分别验证“有已知良好配置”和“无备份重建”两条恢复路线。
 
-Switch through every profile and assert that only owned fields change. Add a new plugin while one profile is active, switch away and back, and confirm it survives.
+## 首次使用
 
-Also inject external-writer damage:
+| 起点 | 正确动作 | 失败时收敛 |
+| --- | --- | --- |
+| 只有官方状态 | 登记并保护官方，再引导 API 初始化 | 官方仍可用，API 未就绪 |
+| 只有 API 状态 | 登记并保护 API，再引导 OAuth | API 仍可用，官方未就绪 |
+| 两种都已验证 | 运行正常切换 | 回到来源档案 |
+| 没有凭据 | 不写入，让用户选择先建立哪种 | 保持未初始化 |
+| 路线与认证矛盾 | 停止并解释，不捕获快照 | 进入人工修复 |
+| OAuth 过期 | 要求重新登录 | 其他档案不受影响 |
+| API Key 无效 | 不提交目标档案 | 原档案继续可用 |
 
-- an empty `config.toml`;
-- malformed TOML;
-- a much smaller generic/common-provider template;
-- missing plugin, MCP, skill, hook, permission and project keys;
-- a stale `model_provider` name with no matching definition;
-- a competing config manager running during preflight.
+每个新建模式都必须跨完整重启检查点。重启前的文件检查不能代替新进程的真实请求。
 
-Ordinary switching must stop before changing route or credentials. Exercise both recovery routes: restore a user-managed known-good config, and reconstruct a minimal config when no backup exists. The no-backup report must distinguish recovered evidence, user-supplied values and unknown values.
+## 档案生命周期
 
-## First-use matrix
+至少验证：新增官方账号、新增中转、更新接口、轮换密钥、修改模型、OAuth 过期、删除非当前档案、拒绝删除当前档案、取消初始化、恢复未完成事务。每项都要有明确的成功状态、失败状态和再次进入入口。
 
-Test:
+多中转实现至少使用两个模型名称和代理策略不同的合成中转。不得把一个中转的模型带入另一个档案，也不得在模型不可用时静默替换。
 
-| Starting state | Expected behavior |
-| --- | --- |
-| Valid official state only | Register it, require intentional API setup |
-| Valid API state only | Register it, require intentional official login |
-| Both protected profiles ready | Switch normally |
-| No credential | Stop before writing |
-| Route/auth mismatch | Explain conflict; do not capture it |
-| Expired OAuth | Require official reauthentication |
-| Invalid API key | Keep prior working profile active |
+## 历史兼容
 
-For every row that creates a previously missing mode, test the required restart checkpoints. A pre-restart file inspection must never satisfy the post-restart acceptance gate.
+用合成数据覆盖：
 
-## Profile matrix
+- JSONL 首行会话元数据、重复线程设置事件和多个 SQLite 中混合 provider；
+- 当前与归档本地会话，以及不在范围内的云端 ChatGPT Work／Chat 记录；
+- 不同长度 provider、畸形 JSONL、SQLite WAL 和准备后历史变化；
+- 正常及通用响应项目编号、reasoning、工具调用与结果；
+- 部分修复后的字段级回滚。
 
-For each official account and API provider:
+验收必须同时满足：所有目标结构可解析、SQLite 完整性通过、关系不悬空、目标范围没有意外 provider、新会话在两种模式都写入 `openai`、代表性旧会话在完整重启后都能续聊。provider 通过不能掩盖响应项目编号失败。
 
-- effective route is correct;
-- credential type matches the route;
-- selected model is available;
-- proxy policy is applied as intended;
-- HTTPS Responses works;
-- WebSocket capability is measured separately;
-- a new conversation works;
-- a representative existing conversation resumes;
-- a second switch returns to the previous profile cleanly.
+## 网络与真实路线
 
-For a multi-relay implementation, use at least two fixture relays with different model names and proxy policies. Confirm that switching changes only declared route/model/proxy fields, activates the matching credential, never copies one relay's model into another profile, and stops rather than silently substituting an unavailable model.
+分别验证 DNS/TLS、HTTPS Responses、WebSocket 升级、系统代理继承、认证和模型。探针必须使用与新启动 Codex 相同的环境，并记录脱敏结果和 Codex 版本。
 
-## History tests
+不要把 WebSocket 失败后 HTTPS 成功写成“账号切换成功”的唯一证据；也不要把中转不支持 WebSocket误判成历史损坏。
 
-Use synthetic fixtures, not private conversations, to cover:
+## 故障恢复
 
-- mixed provider names across first-line session metadata, repeated thread-settings events and multiple SQLite stores;
-- provider names both equal and unequal in byte length to `openai`;
-- active and archived local sessions while cloud ChatGPT Work/Chat records remain untouched;
-- valid response item identifiers;
-- generic identifiers on different semantic item types;
-- recoverable and unrecoverable reasoning records;
-- tool calls and results;
-- repeated provider metadata;
-- archived sessions;
-- malformed JSONL;
-- SQLite WAL mode;
-- history changing after preparation;
-- rollback after partial repair.
+注入：两个切换同时发生、陈旧锁、文件被占用、磁盘写满、受保护快照不可用、预检查后状态变化、每个首次初始化阶段之间重启、重复执行继续命令、外部管理器在提交前改写配置。
 
-Acceptance requires structural parsing, relationship checks, SQLite integrity and a target-version resume test.
+每个用例最终只能落到以下三类之一：
 
-For the shared-provider contract, additionally verify:
+1. 已验证的来源状态；
+2. 已验证的目标状态；
+3. 自动操作已经停止、证据完整的“需要人工检查”。
 
-- the live user configuration sets `model_provider = "openai"` in every official and API-compatible profile;
-- official mode omits the endpoint override and API-compatible mode supplies the intended top-level `openai_base_url`;
-- the historical normalization manifest reconciles every changed JSONL field and SQLite row;
-- no unexpected provider value remains in the intended local scope;
-- new sessions created after preparation record `openai` in both modes;
-- representative normalized old sessions resume through both modes after full restarts;
-- response-item compatibility is tested independently, so a provider-only pass cannot hide an `item_`/typed-ID failure.
+不允许留下没有恢复入口的“部分成功”。
 
-## Network tests
+## 升级门禁
 
-Separate:
+Codex 更新后，重新盘点配置格式、认证位置、新会话结构、HTTPS、WebSocket、代理和历史夹具。通过前把旧验证标记为失效，不允许静默沿用。
 
-- DNS/TLS;
-- HTTPS route;
-- WebSocket upgrade;
-- proxy inheritance;
-- authentication;
-- model availability.
+## 发布证据
 
-Run them with the same environment inherited by a newly started Codex process. Record sanitized results and the Codex version.
-
-## Failure and recovery tests
-
-Inject interruption after every transaction stage. Also test:
-
-- two switch attempts at once;
-- stale lock recovery;
-- read-only or locked files;
-- full disk;
-- protected snapshot unavailable;
-- state changed between preflight and commit;
-- machine or Codex restarted between every bootstrap phase;
-- bootstrap resume command run twice;
-- rollback state changed by the user;
-- Codex process restarts during the barrier.
-- CC Switch or another config manager rewrites the live file between preflight and commit;
-- the user replaces the known-good config deliberately, proving that retention stays bounded rather than accumulating silently.
-
-## Upgrade test
-
-After a Codex update:
-
-1. rerun discovery;
-2. compare configuration schema and effective fields;
-3. recheck auth storage;
-4. inspect new session records;
-5. repeat HTTPS and WebSocket probes;
-6. run history fixtures;
-7. switch only after the version gate passes.
-
-## Release evidence
-
-A release or local deployment report should include:
-
-- operating system and Codex version;
-- tested profile types;
-- configuration preservation result;
-- history fixture result;
-- network capability matrix;
-- failure-injection result;
-- privacy scan result;
-- known limitations;
-- recovery instructions.
-
-Do not include tokens, account identifiers, private hosts or conversation text.
+本机实现的交付报告应写明系统和 Codex 版本、测试档案类型、配置保留结果、历史夹具结果、网络能力表、故障注入结果、隐私扫描、已知限制和恢复入口，不得包含令牌、账号标识、私人接口或对话正文。

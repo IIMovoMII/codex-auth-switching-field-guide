@@ -1,144 +1,119 @@
-# First use and restart checkpoints
+# 首次使用与重启检查点
 
-First use is not a one-pass inspection. Some configuration, authentication, proxy and plugin state becomes trustworthy only after a fresh Codex process loads it, and OAuth requires an interactive user step. A safe implementation must survive several Codex shutdowns and continue from durable checkpoints.
+> English: [first-use-bootstrap.en.md](first-use-bootstrap.en.md)
 
-## Hard invariant
+首次使用不是一次检查就能结束。部分配置、认证、代理和插件状态只有全新 Codex 进程加载后才可信，OAuth 还需要用户交互。安全实现必须能跨多次关闭、重启甚至电脑重启继续。
 
-A profile is not ready because its files look correct before restart. It becomes ready only after a fresh Codex process has loaded the staged state and a target-specific probe has succeeded.
+## 硬规则
 
-The current Codex task may be interrupted when Desktop must close. Before asking for a restart, persist a non-secret checkpoint and show the exact action that resumes the bootstrap.
+文件在重启前看起来正确，不代表档案已经可用。只有新进程加载目标状态，并完成该档案对应的真实探针后，才能标记“就绪”。
 
-## Classify the starting state
+要求关闭 Desktop 之前，先保存不含秘密的检查点，并向用户显示下一步动作、恢复入口和失败回滚方法。
 
-| Detected state | Required response |
+如果本机已部署桌面提醒程序，每次计划内关闭前还要写入有期限的维护标记，验证或回滚结束后清除。标记只能抑制本次计划内退出提醒，不能屏蔽明确错误。
+
+## 判断起点
+
+| 检测状态 | 必须采取的动作 |
 | --- | --- |
-| Valid official state, no API profile | Protect the official state, then initialize API in stages |
-| Valid API state, no official profile | Protect the API state, then initialize official OAuth in stages |
-| Both states already validated | Use the normal switch transaction |
-| Neither credential exists | Stop and ask which mode the user wants to establish first |
-| Route, auth and model disagree | Do not capture the state; resolve the mismatch first |
-| Snapshot exists but its post-restart validation is missing | Resume the recorded bootstrap phase rather than starting over |
+| 只有有效官方状态 | 保护官方状态，再分阶段初始化 API |
+| 只有有效 API 状态 | 保护 API 状态，再分阶段初始化官方 OAuth |
+| 两种状态都已验证 | 使用正常切换事务 |
+| 两种凭据都不存在 | 停止，让用户选择先建立哪一种 |
+| 路线、认证、模型互相矛盾 | 不得捕获，先解决冲突 |
+| 已有快照但缺少重启后验证 | 从记录的阶段继续，不能从头覆盖 |
 
-Before a first transition between official and API-compatible modes, add a read-only history-provider checkpoint. Inventory all active and archived local provider values. If the installed Codex build has proved the shared `openai` identity contract and the inventory is mixed, require a separate approved history-preparation operation while every Codex writer is stopped. The credential bootstrap resumes only after that operation has its own verified manifest and fingerprint.
+第一次跨官方／API 前，还要增加只读历史 provider 检查点。已证明共同 `openai` 契约且历史值混杂时，先在所有写入者退出后执行单独的历史准备；只有拿到经过验证的清单和指纹，认证初始化才能继续。
 
-## Durable bootstrap record
+## 持久检查点
 
-Store only metadata such as:
+只保存非敏感元数据：
 
 ~~~text
-bootstrap_id
-schema_version
-starting_mode
-target_profile_id
-phase
-pre_change_fingerprints
-expected_post_restart_state
-next_user_action
-transaction_id
-last_verified_codex_version
+初始化编号
+结构版本
+起始模式
+目标档案编号
+当前阶段
+修改前指纹
+重启后预期状态
+下一步用户动作
+事务编号
+最后验证的 Codex 版本
 ~~~
 
-Never store a token, OAuth document, conversation body or secret endpoint parameter in this record. Credential bytes belong in the protected snapshot store.
+令牌、OAuth 文档、对话正文和带秘密的接口参数不能进入检查点；凭据字节属于受保护快照存储。
 
-Useful phases are:
+建议阶段：
 
 ~~~text
-baseline_verified
-target_staged
-restart_required
-interactive_login_required
-post_restart_probe_required
-target_verified
-rollback_required
-complete
+基线已验证
+目标已暂存
+需要重启
+需要人工登录
+等待重启后探针
+目标已验证
+需要回滚
+完成
 ~~~
 
-Every phase transition must be idempotent. Repeating the resume command after a crash should verify current state and continue safely, not duplicate credentials or overwrite a newer configuration.
+每个阶段必须可重复执行。崩溃后再次点击“继续”应先核对当前状态，再安全推进，不能重复生成凭据或覆盖用户后来改过的配置。
 
-## When no official OpenAI login exists
+## 本机从未官方登录
 
-1. Verify and protect the current known-good API state, if one exists.
-2. Confirm Codex Desktop, CLI and helper writers are stopped.
-3. Stage the official route by removing API endpoint overrides and applying only the owned official-mode fields.
-4. Confirm the live route still uses the verified `model_provider = "openai"` identity. If old local provider metadata is mixed, finish the separately approved normalization and its rollback validation now.
-5. Write <code>interactive_login_required</code> before starting Codex.
-6. Tell the user to reopen Codex and complete the official OAuth flow in the official route.
-7. After login, require another complete Codex shutdown so the bootstrap process can inspect a stable credential store.
-8. Resume from the checkpoint and verify:
-   - the active auth type is OAuth;
-   - no API endpoint override remains;
-   - a fresh official request succeeds;
-   - the intended model is available;
-   - a representative local task can be opened.
-9. Only then protect the official snapshot and mark the profile ready.
-10. Return to the user's requested final profile through the normal switch transaction.
+1. 如果已有 API 状态，先验证并保护它。
+2. 确认 Desktop、CLI、辅助程序和外部配置管理器都已退出。
+3. 只修改自管字段，移除 API 接口覆盖并暂存官方路线。
+4. 核对共同身份仍是已经验证的 `model_provider = "openai"`；混合历史必须先完成单独准备。
+5. 在启动 Codex 前写入“需要人工登录”检查点。
+6. 告诉用户重新打开 Codex，在官方路线完成 OAuth。
+7. 登录后再次完全关闭 Codex，使认证存储稳定。
+8. 从检查点恢复并验证：认证类型为 OAuth、没有中转覆盖、官方真实请求成功、目标模型可用、代表性本地任务能打开。
+9. 只有全部通过后，才保护官方快照并把档案标为就绪。
+10. 通过正常事务返回用户要求的最终档案。
 
-If the OAuth flow fails or the route still points at an API provider, keep the previous known-good profile and leave a resumable failure state. Do not save the failed login as an official profile.
+如果 OAuth 被取消、仍走中转或真实请求失败，保留原可用档案并留下可继续／回滚状态，不能保存失败登录。
 
-## When no API or relay configuration exists
+## 本机从未配置 API／中转
 
-1. Ask for non-secret intent:
-   - provider display name;
-   - base URL convention;
-   - supported Responses transport;
-   - desired model;
-   - proxy policy.
-2. Give the user a local masked input or provider-supported credential-entry action. Do not ask for the API key in chat and do not echo it to logs.
-3. Validate the endpoint format without credentials where possible.
-4. Stop all Codex writers.
-5. Stage only the owned route, model and proxy fields, activate the locally entered credential, and save <code>restart_required</code>.
-6. Reopen Codex from a fresh process.
-7. Run separate post-restart probes for:
-   - effective base URL;
-   - active auth type;
-   - selected model;
-   - HTTPS Responses;
-   - WebSocket upgrade when relevant;
-   - system-proxy behavior;
-   - preservation of plugins, MCP servers, skills and hooks.
-8. Stop Codex again before capturing the stable credential snapshot.
-9. Mark the API profile ready only after every required probe passes.
+1. 只询问非秘密意图：显示名称、接口地址规则、Responses 传输能力、模型和代理策略。
+2. 提供本地遮罩输入或供应商支持的凭据入口；不得要求把 API Key 发进聊天或日志。
+3. 在不带凭据时尽量先验证地址格式。
+4. 停止全部写入者。
+5. 暂存自管路线、模型和代理字段，启用本地输入的凭据，并保存“需要重启”。
+6. 从新进程打开 Codex。
+7. 分别验证：生效地址、认证类型、模型、HTTPS Responses、需要时的 WebSocket、系统代理，以及插件、MCP、技能和钩子保留。
+8. 再次关闭 Codex，确认凭据稳定后才捕获快照。
+9. 所有必要探针通过后才把 API 档案标为就绪。
 
-If the provider needs a model the user has not selected, present the discovered model choices and wait. Do not guess a model ID and call the profile complete.
+如果目标模型未确定，展示实际探测到的候选项并等待用户选择，不能猜一个编号完成初始化。
 
-## Why several restarts may be necessary
+## 为什么可能需要多次重启
 
-Different values become trustworthy at different times:
-
-| Stage | What can be verified |
+| 阶段 | 可以可靠验证的内容 |
 | --- | --- |
-| Before restart | TOML parses, intended fields and rollback material are correct |
-| First fresh process | Codex actually loads route, model, feature flags and credential type |
-| After interactive OAuth | The official login exists, but the credential store may still be changing |
-| After stopping again | The new auth state is stable enough to snapshot |
-| Second fresh process | The protected snapshot can be restored and used successfully |
+| 重启前 | TOML 可解析、目标字段和回滚材料正确 |
+| 第一个新进程 | Codex 实际加载路线、模型、功能开关和认证类型 |
+| 人工 OAuth 后 | 登录已经产生，但认证存储可能仍变化 |
+| 再次关闭后 | 新认证状态稳定，可以捕获 |
+| 第二个新进程 | 受保护快照能够恢复并真实使用 |
 
-An implementation should display progress such as “stage 2 of 5 — restart required,” not claim that all checks were completed in one uninterrupted task.
+界面应显示“第 2／5 阶段：需要重启”之类的明确进度，而不是在一个对话中声称全部检查完成。
 
-## Resume experience
+## 继续、取消与回滚
 
-Before every restart, show:
+每次重启前显示：已验证内容、重启原因、用户需要做什么、准确的继续按钮／命令、之后检查什么、如何恢复起始档案。
 
-- what has already been verified;
-- why the restart is required;
-- what the user must do while Codex is open;
-- the exact resume command or button;
-- what will be checked afterward;
-- how to restore the starting profile if the next stage fails.
+继续时比较实时状态与预期；不一致就解释差异并提供回滚，不能跳过阶段。
 
-On resume, compare the live state with <code>expected_post_restart_state</code>. If it differs, explain the mismatch and offer rollback; never skip ahead.
+用户取消初始化时：
 
-## Validation cases
+1. 确认所有写入者退出；
+2. 恢复起始配置和认证；
+3. 验证真实请求；
+4. 删除未就绪目标档案及其临时凭据；
+5. 把检查点标为“已取消”，避免下次误继续。
 
-Test at least:
+## 验证场景
 
-- no official state, successful OAuth across restarts;
-- OAuth cancelled midway;
-- no API state, locally entered valid key;
-- invalid endpoint, invalid key and unavailable model;
-- Codex reopened but not fully stopped before snapshot;
-- machine reboot between stages;
-- resume command run twice;
-- live config edited between stages;
-- rollback after each phase;
-- final switch to both newly initialized profiles.
+至少覆盖：无官方状态并成功 OAuth、OAuth 中途取消、无 API 状态并本地输入有效密钥、地址／密钥／模型无效、Codex 未完全退出就尝试捕获、阶段间重启电脑、继续命令执行两次、阶段间配置被修改、每个阶段的回滚，以及两个新档案最终都能切换。

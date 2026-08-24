@@ -1,123 +1,92 @@
-# Safety and rollback
+# 安全与回滚
 
-Authentication switching handles secrets and user history. Recovery design is part of the feature, not a later addition.
+[English](safety-and-rollback.en.md)
 
-## Secret boundary
+账号切换同时接触凭据、配置和对话历史。回滚不是附加功能，而是允许写入的前提。
 
-Never place these in the repository, prompt, console transcript or normal log:
+## 秘密边界
 
-- API keys;
-- OAuth access or refresh tokens;
-- cookies;
-- complete authentication files;
-- signed endpoint URLs;
-- private account identifiers;
-- conversation bodies.
+以下内容不得进入仓库、提示词、普通日志或支持截图：
 
-The switching process can copy opaque credential bytes without displaying or parsing secret fields. Diagnostics should expose type, hash, age and validity result only.
+- API Key；
+- OAuth 访问令牌和刷新令牌；
+- Cookie、完整认证文件和签名网址；
+- 私人账号标识；
+- 对话正文。
 
-## Local protection
+程序可以把认证文件当作不透明字节复制和恢复，但不得把秘密字段打印出来。诊断只显示认证类型、文件哈希、更新时间和验证结果。
 
-On Windows:
+Windows 上的闲置认证快照应使用当前用户保护机制，并限制目录权限。活动凭据如果必须保持 Codex 所需格式，也要依靠文件权限保护。删除档案与删除其凭据是两个动作，都需要明确确认。
 
-- use a current-user protection mechanism such as DPAPI for inactive snapshots;
-- restrict the state directory ACL to the current user;
-- avoid inherited broad permissions;
-- protect transaction rollback material as carefully as credentials;
-- document that protected snapshots are not portable backups;
-- provide a deliberate delete-profile operation.
+## 写入屏障
 
-The active credential may need to remain in Codex's expected plain file format. Protect it with filesystem permissions and minimize its exposure window.
+修改当前认证、实时配置或历史前：
 
-## Process barrier
+1. 找出 Codex Desktop、CLI、辅助进程和外部配置管理器；
+2. 如有通知程序，在要求用户关闭 Codex 前写入短期维护标记，只抑制本次计划内退出提醒；
+3. 要求用户完全关闭相关写入者；
+4. 在有限时间内等待退出并再次核实；
+5. 仍有写入者时拒绝操作，并清除或缩短维护标记。
 
-Before a sensitive transition:
+不要仅凭进程名称结束不相关程序。CC Switch 与自建切换器也不能轮流拥有同一个实时配置。
 
-1. identify all Desktop, CLI, helper and external config-manager processes that can read or write the state;
-2. ask the user to close them;
-3. wait for clean exit with a bounded timeout;
-4. refuse the write if any writer remains;
-5. create a short maintenance marker for notification monitors.
+## 事务日志
 
-Do not terminate unrelated processes by name. Resolve exact executable paths and parent relationships.
+第一次改变状态前，先持久保存：
 
-CC Switch and a custom live-config switcher are incompatible owners of one Codex `config.toml`. A process-name check is only a convenience guard; the real safety rule is that the user selects one writer and stops using the other for Codex configuration.
+- 事务编号和格式版本；
+- 来源与目标档案；
+- Codex 版本；
+- 相关文件的写前哈希；
+- 计划修改的字段；
+- 受保护的回滚材料；
+- 每个已完成阶段；
+- 最终验证结果。
 
-## Transaction journal
+日志必须先落盘再写目标文件。程序下次启动发现未完成事务时，应先提供“继续验证、回滚、人工检查”，不能直接开始新切换。
 
-The journal should contain:
+## 备份边界
 
-- transaction ID and schema version;
-- source and target profile IDs;
-- start time and Codex version;
-- hashes of source files;
-- intended field changes;
-- protected rollback blobs;
-- completed stage markers;
-- final verification result.
+- 引入切换器前，由用户保存一份在全新 Codex 进程中通过真实请求的完整 `config.toml`。
+- 不要求不断累积配置备份；一份由用户维护的已知良好恢复点即可。
+- 普通档案快照与历史修复备份必须分开。
+- 使用 SQLite 的备份接口并做完整性检查，不能只复制处于 WAL 模式的主数据库文件。
+- 不得用旧的整份 JSONL 覆盖后来追加的新内容。
+- 所有备份在使用前都要核对哈希与范围。
 
-Write and flush the journal before the first state mutation. Update it after each durable stage. On next launch, detect an unfinished journal and offer verified recovery before any new switch.
+配置为空、无法解析或明显缩成通用模板时，普通切换必须停止，转入[配置恢复](config-recovery.md)。
 
-## Backup rules
+## 回滚规则
 
-- Before introducing a config manager, ask the user to save one complete config that has passed a real request from a fresh Codex process.
-- Do not require an ever-growing config archive. One deliberately managed known-good config is a valid bounded recovery policy; replace it only after the new state is accepted and tested.
-- Use sibling temporary files on the same volume for atomic replacement.
-- Verify a backup hash before relying on it.
-- Use the SQLite backup API and an integrity check; do not treat the main database file alone as a complete WAL-aware backup.
-- Keep history repair backups separate from ordinary profile snapshots.
-- Apply retention limits only after at least one known-good rollback point exists.
-- Never restore a full older history file over content that changed after the backup.
+回滚时：
 
-Config backup and history-repair backup are different things. The first protects a relatively small user configuration; the second may contain private conversations and live database state and must follow the stricter history workflow.
+1. 重新取得同一把独占锁；
+2. 核对当前状态仍是本事务写出的状态；
+3. 只撤销日志记录的字段或记录；
+4. 原子恢复之前的认证；
+5. 再次解析配置和认证结构；
+6. 核对路线、认证和模型一致；
+7. 标记事务已回滚，并保留脱敏审计信息。
 
-If `config.toml` is empty or reduced to a generic template, ordinary switching must stop. Use the offline playbook in [config recovery and external writers](config-recovery.md). When no good config exists, label reconstructed values explicitly and never invent missing commands, paths, endpoints or models.
+如果当前文件已经被用户或其他工具改过，不能强行覆盖。此时状态应变为“需要人工检查”，并给出差异范围和安全恢复入口。
 
-## Rollback rules
+## 中断后的确定结果
 
-Rollback should:
+| 中断位置 | 启动时动作 | 可接受结果 |
+| --- | --- | --- |
+| 只创建日志，尚未写文件 | 删除未开始事务或继续 | 原状态完整 |
+| 配置已暂存，尚未启用 | 丢弃暂存文件 | 原状态完整 |
+| 配置已启用，认证未启用 | 按日志恢复配置 | 原状态完整 |
+| 认证已启用，尚未验证 | 让用户选择验证目标或整体回滚 | 完整旧状态或完整新状态 |
+| 已验证，尚未提交 | 重新核对哈希后提交 | 完整新状态 |
+| 当前文件与日志不一致 | 停止自动恢复 | 明确的人工检查状态 |
 
-1. reacquire the same exclusive lock;
-2. verify current file identity and expected post-write state;
-3. reverse only the journaled fields or records;
-4. restore the prior protected credential atomically;
-5. parse configuration and authentication structure;
-6. validate route/auth consistency;
-7. mark the transaction rolled back;
-8. retain a redacted audit record.
+任何阶段都不能以“配置是新的、认证还是旧的”作为结束状态。
 
-If current state no longer matches the journal, stop and require manual review. Silent force-restore risks deleting newer user activity.
+## 故障注入
 
-## Failure injection
+用合成数据在日志创建、配置启用、认证启用、历史数据库更新、验证完成但未提交等阶段强制中断。每次恢复都必须收敛到完整旧状态或完整新状态。磁盘写满、只读文件、锁冲突、两个切换同时发生和外部写入者插入也要测试。
 
-Test recovery by deliberately interrupting fixtures after:
+## 给用户看的信息
 
-- journal creation;
-- configuration staging;
-- configuration activation;
-- credential staging;
-- credential activation;
-- history database update;
-- verification but before commit.
-
-Every interruption point should converge to either the complete old state or the complete new state. “Mostly switched” is not acceptable.
-
-## User-facing safety
-
-Before writing, show:
-
-- source profile;
-- target profile;
-- fields to be changed;
-- whether a history gate is required;
-- whether Codex is fully closed;
-- where recovery material will be stored.
-
-After writing, show:
-
-- resulting profile and auth type;
-- validation result;
-- whether a restart is required;
-- exact rollback command or recovery path.
-
-Never display the credential value.
+写入前显示来源、目标、会改哪些字段、是否涉及历史、Codex 是否已关闭以及恢复材料位置。写入后显示实际档案、认证类型、验证结果、是否需要重启以及恢复入口。任何时候都不显示凭据值。

@@ -1,130 +1,125 @@
-# Discovery
+# 环境盘点
 
-The implementation should begin with a read-only inventory. The output is a redacted state report, not a dump of local files.
+> English: [discovery.en.md](discovery.en.md)
 
-## 1. Establish the runtime boundary
+实施必须从只读盘点开始。产物是一份脱敏状态报告，不是本地文件内容转储。
 
-Record:
+## 1. 确认运行边界
 
-- Windows version and architecture;
-- Codex Desktop and CLI versions;
-- whether Desktop and CLI use the same Codex home;
-- relevant process names and child processes;
-- CC Switch or any other config/profile manager that can rewrite the same Codex home, including startup or background behavior;
-- whether the current app combines ChatGPT and Codex surfaces;
-- configuration reload behavior observed in this build.
+记录：
 
-Do not assume that closing a visible window ends every process. Prove which processes can still write configuration, credentials, JSONL or SQLite.
+- Windows 版本与架构；
+- Codex Desktop 和 CLI 版本；
+- Desktop 与 CLI 是否使用同一个 Codex 主目录；
+- 相关进程、子进程和实际可执行文件路径；
+- 当前应用是否把 ChatGPT 与 Codex 界面合并；
+- 本版本实际观察到的配置重载行为；
+- CC Switch 或其他可能改写同一 Codex 主目录的配置管理器，包括后台和开机启动行为。
 
-## 2. Locate state
+关闭可见窗口不一定代表所有写入者都退出。必须确认哪些进程仍可能写配置、认证、JSONL 或 SQLite。
 
-Discover rather than hard-code:
+## 2. 找到实际状态位置
 
-- effective Codex home;
-- live <code>config.toml</code>;
-- active authentication store, such as <code>auth.json</code> or a supported keyring;
-- rollout or session JSONL roots, including archived locations;
-- SQLite databases and their journal mode;
-- plugin, MCP, skill and hook configuration;
-- project or workspace metadata;
-- any existing profile-switcher state.
-- whether the user has a complete, known-good `config.toml` that passed a real request after restart; report presence only, never its values.
+不要写死路径，实际发现：
 
-Use placeholders such as <code>%USERPROFILE%\.codex</code> in reports. Never publish a real username or absolute home path.
+- 生效的 Codex 主目录；
+- 用户级 `config.toml`；
+- 原生 `*.config.toml` 档案及其选择方式；
+- 当前认证存储，例如 `auth.json` 或系统钥匙串；
+- 当前及归档 rollout／会话 JSONL 根目录；
+- SQLite 数据库及日志模式；
+- 插件、MCP、技能和钩子配置；
+- 项目／工作区元数据；
+- 已存在的档案切换器状态；
+- 用户是否有一份在重启后完成过真实请求的完整、已知良好配置，只报告“有／无”，不显示内容。
 
-## 3. Parse configuration structurally
+报告中使用 `%USERPROFILE%\.codex` 等通用写法，不能公开真实用户名和用户目录。
 
-Use a TOML parser when possible. Inventory:
+当前 [Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference) 明确区分用户级与项目级配置：provider、认证、通知和档案选择等机器级字段不能由项目 `.codex/config.toml` 覆盖。发现这些字段时必须记录它们来自哪一层，不能只看项目文件。
 
-- effective <code>model_provider</code>;
-- top-level endpoint override fields;
-- selected model and reasoning settings;
-- custom provider tables;
-- feature flags related to transport or proxy handling;
-- plugins, MCP servers, skills, hooks, permissions and project entries;
-- config layers or profiles that can override each other.
-- signs that a complete config was replaced by a smaller generic/common template, such as missing previously expected subsystem tables.
+## 3. 按结构解析配置
 
-The report should identify where an effective value came from. A visually present field may be shadowed by another layer.
+尽量使用 TOML 解析器，盘点：
 
-Do not read the configuration as a block of text and replace matching lines. Duplicate tables, comments, ordering and later overrides make text substitution fragile.
+- 生效的 `model_provider`；
+- 顶层接口地址覆盖；
+- 模型及推理设置；
+- 自定义 provider 表；
+- 与代理、WebSocket 或传输相关的功能开关；
+- 插件、MCP、技能、钩子、权限和项目项；
+- 配置层和原生档案之间的覆盖关系；
+- 完整配置是否突然缩成了缺少子系统表的通用模板。
 
-## 4. Classify authentication without exposing it
+报告要说明生效值来自哪里。文件中“看得到”不代表没有被另一层覆盖。
 
-Determine:
+不得把配置当普通文本做全局替换。重复表、行内注释、数组表和后续覆盖都会让简单替换失效。
 
-- whether the active state is OAuth, API key, absent or malformed;
-- whether the credential store is readable by Codex;
-- whether its apparent auth type agrees with the active route;
-- whether an existing inactive snapshot is protected and current.
+## 4. 不暴露内容地判断认证
 
-Diagnostics should return facts such as <code>auth_type = oauth</code> or <code>auth_type = api_key</code>. They should never print a token, refresh token, account cookie or full credential document.
+确认：
 
-If official login has never happened on this machine, report that the official profile is uninitialized. Do not create a fake placeholder and call it ready.
+- 当前认证是 OAuth、API Key、缺失还是损坏；
+- Codex 实际从文件还是系统安全存储读取；
+- 认证类型是否与路线一致；
+- 已保存的闲置认证快照是否受保护、属于哪个档案、是否仍通过版本门禁。
 
-## 5. Inventory conversation storage
+诊断只能输出 `认证类型 = OAuth` 之类的事实，不能打印访问令牌、刷新令牌、Cookie 或完整认证文档。
 
-Count and classify, without copying content into logs:
+如果本机从未官方登录，标记“官方档案尚未初始化”，不能创建空文件并声称已经就绪。
 
-- active and archived JSONL files;
-- distinct session metadata provider values and per-value counts;
-- distinct thread-settings provider identifiers and per-value counts;
-- response-item identifier families by semantic type;
-- every relevant SQLite store, its thread-provider values and per-value counts;
-- WAL and shared-memory side files;
-- currently open or recently changing files.
+## 5. 盘点本地对话存储
 
-Reconcile the provider counts across semantic copies. A provider value present in one session metadata record but repeated in many thread-settings events is not several unrelated problems. Record which local thread IDs and storage layers would be in scope for normalization, but do not log titles or conversation text.
+只统计结构，不复制正文：
 
-Separately identify cloud-backed ChatGPT Work/Chat records. Do not infer that they are editable local rollouts merely because the combined desktop app displays them beside Codex tasks.
+- 当前及归档 JSONL 文件数量；
+- 会话元数据中各 provider 值及数量；
+- 线程设置事件中各 provider 值及数量；
+- 按语义类型统计响应项目编号家族；
+- 每个相关 SQLite 的线程 provider 值及数量；
+- WAL／共享内存旁文件；
+- 正在打开或近期仍变化的文件。
 
-Sample structure, hashes and timestamps rather than user messages. A useful report says “three reasoning items use an unexpected identifier family,” not what the user discussed.
+要对齐同一语义的多份副本。一个 provider 同时出现在会话元数据、重复线程设置事件和索引行里，不代表它们是互不相干的问题。
 
-## 6. Test endpoint capabilities
+单独识别云端 ChatGPT Work／Chat 记录。合并后的 Desktop 把它们显示在 Codex 任务旁边，不代表它们是可直接修改的本地 rollout。
 
-For each intended route, determine:
+报告可以说“有 3 个 reasoning 项使用异常编号家族”，不能说出用户讨论了什么。
 
-| Capability | Questions |
+## 6. 实测接口能力
+
+每个候选路线分别确认：
+
+| 能力 | 要回答的问题 |
 | --- | --- |
-| Authentication | Which credential type is accepted? |
-| Base URL | Does the configured base already include the API version segment? |
-| Responses over HTTPS | Is the exact route implemented? |
-| Responses over WebSocket | Is the upgrade route implemented and reachable? |
-| Models | Which model identifiers are available? |
-| Proxy | Does the process honor the expected Windows proxy path? |
-| Error shape | Are structured errors preserved or rewritten? |
+| 认证 | 接受哪种凭据？ |
+| 接口地址 | 配置值是否已经包含版本路径？ |
+| HTTPS Responses | 精确路径是否实现？ |
+| Responses WebSocket | 升级路径是否实现且可达？ |
+| 模型 | 哪些模型编号真实可用？ |
+| 代理 | 新启动的 Codex 是否走预期 Windows 代理？ |
+| 错误 | 错误结构是否被中转站重写？ |
 
-Use a minimal, non-sensitive probe. Separate connectivity, authentication and model availability so one failure is not misdiagnosed as another.
+使用最小、非敏感探针，并把连通性、认证与模型可用性分开，不能用一次 401 推断 provider 配置错误。
 
-For the shared-identity design, also prove that the installed build can create a new session with `model_provider = "openai"` in both modes: official routing with no endpoint override, and API-compatible routing with the top-level `openai_base_url` override. If either route requires a different provider identity, do not normalize history to `openai`.
+共同身份方案还必须证明：官方路线在没有接口覆盖时，新会话记录 `openai`；API 兼容路线在顶层 `openai_base_url` 覆盖下也记录 `openai`。任一路线无法满足时，不得把历史统一到 `openai`。
 
-## 7. Define the requested profile set
+## 7. 确认用户想要的档案集合
 
-Ask for intent only after machine facts are known:
+了解：
 
-- number of official accounts;
-- number of API or relay providers;
-- preferred model per profile;
-- whether profiles need different proxy behavior;
-- whether old conversations must be resumed in every mode;
-- whether the user accepts a manual login step on first use;
-- whether the switcher may require Codex to be fully closed.
+- 官方账号数量；
+- API／中转供应商数量；
+- 每个档案的首选模型；
+- 是否需要不同代理策略；
+- 旧对话是否要在每种模式续聊；
+- 首次使用是否接受人工登录步骤；
+- 是否接受切换前完全关闭 Codex；
+- 是否准备停止 CC Switch 对 Codex 配置的管理。
 
-The answer determines whether a simple two-state switch or a profile registry is appropriate.
+答案决定实现两态开关还是多档案注册表。
 
-## Discovery deliverable
+## 盘点交付物
 
-Produce a redacted table containing:
+输出一张脱敏表，包含通用化路径、生效路线和认证、配置一致性、活跃写入者、历史兼容概况、传输能力、尚未初始化的档案，以及升级后必须复测的假设。
 
-- detected paths expressed generically;
-- effective route and auth type;
-- configuration consistency;
-- active writers;
-- history compatibility summary;
-- transport capability summary;
-- missing states that require intentional user setup;
-- version-sensitive assumptions that must be validated.
-
-Stop here if the state is inconsistent. Resolve the mismatch before designing writes.
-
-If another manager owns the live config, stop and ask the user to select one writer. If the file is already empty, malformed or incomplete, follow [config recovery and external writers](config-recovery.md) before profile design.
+如果发现路线、认证或配置所有权冲突，到这里就停止。先解决冲突，再设计写入。

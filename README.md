@@ -1,229 +1,247 @@
 <div align="center">
 
-# Codex Auth Switching Field Guide
+# Codex 账号与接口切换经验指南
 
-**Build a machine-specific, rollback-first workflow for switching Codex between official OAuth accounts and API-compatible endpoints on Windows.**
+**在 Windows 上，为当前电脑量身设计一套可回滚的 Codex 官方账号／API 接口切换方案。**
 
-[![Field Guide](https://img.shields.io/badge/type-field%20guide-6f42c1)](#what-this-is)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#scope)
-[![Codex](https://img.shields.io/badge/focus-Codex%20Desktop%20%2B%20CLI-111827)](#scope)
-[![Validation](https://github.com/IIMovoMII/codex-auth-switching-field-guide/actions/workflows/validate.yml/badge.svg)](https://github.com/IIMovoMII/codex-auth-switching-field-guide/actions/workflows/validate.yml)
-[![License](https://img.shields.io/badge/license-MIT-16a34a)](LICENSE)
+[![经验指南](https://img.shields.io/badge/%E7%B1%BB%E5%9E%8B-%E7%BB%8F%E9%AA%8C%E6%8C%87%E5%8D%97-6f42c1)](#这是什么)
+[![平台](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows-0078D4)](#适用范围)
+[![Codex](https://img.shields.io/badge/%E5%AF%B9%E8%B1%A1-Codex%20Desktop%20%2B%20CLI-111827)](#适用范围)
+[![开源许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-MIT-16a34a)](LICENSE)
 
-[简体中文](README.zh-CN.md) · [Agent entrypoint](SKILL.md) · [Companion notification guide](https://github.com/IIMovoMII/codex-desktop-notification-field-guide)
+[English](README.en.md) · [给智能体的入口](SKILL.md) · [配套的桌面通知指南](https://github.com/IIMovoMII/codex-desktop-notification-field-guide)
 
 </div>
 
-## What this is
+## 这是什么
 
-This repository is **not a universal switcher to install**. It is a field guide for an engineer or coding agent to inspect one Windows machine, understand its Codex version and local state, then build the smallest safe switcher that fits that environment.
+这个仓库**不是让所有人直接安装的通用切换器**。它是一份实战经验指南：让开发者或编程智能体先检查一台具体的 Windows 电脑，弄清 Codex 版本和本地状态，再为这台电脑编写最小、可靠、可回滚的切换方案。
 
-The hard part is not changing one URL. A dependable design must preserve a live <code>config.toml</code>, isolate credentials, keep old conversations resumable, survive interrupted writes, recover offline after an external config rewrite, and explain exactly what happens on first use.
+真正困难的不是改一个网址，而是同时保证：
 
-## The problem
+- 持续变化的 <code>config.toml</code> 不被旧快照覆盖；
+- 官方登录和不同 API 凭据彼此隔离；
+- 插件、MCP、Skills、钩子、权限和项目设置继续保留；
+- 旧对话切换后仍能打开和继续；
+- 中途断电或写入失败后能恢复；
+- 外部配置管理器改写或清空 <code>config.toml</code> 后仍有离线救援路径；
+- 第一次使用时不会凭空假设另一种登录状态已经存在。
 
-A single Codex installation may need to alternate between:
+## 要解决的问题
 
-- official OpenAI OAuth accounts;
-- one or more API keys or relay providers;
-- provider-specific model catalogs;
-- different proxy requirements;
-- a shared set of plugins, MCP servers, skills, hooks, permissions, and projects;
-- local conversations created under earlier routing choices.
+同一套 Codex 可能需要在以下状态之间切换：
 
-Copying entire configuration files appears simple, but it silently freezes unrelated settings. Reusing one credential file without a transaction can leave configuration and authentication out of sync. Rewriting active conversation files can corrupt history. Treat switching as a state transition, not a file-copy trick.
+- 不同的 OpenAI 官方 OAuth 账号；
+- 一个或多个 API Key／中转供应商；
+- 各供应商不同的模型列表；
+- 不同的系统代理要求；
+- 一套共同、持续更新的 Codex 功能配置；
+- 由旧路由产生的本地对话历史。
 
-## Concrete use cases
+直接交换整份配置看似简单，却会把插件等其他设置冻结在旧版本。只改配置、不成套切换认证，会让“路由”和“身份”互相打架。Codex 运行时重写历史文件，还可能损坏对话。因此，切换应该被当作一次完整的状态变更，而不是复制文件的小技巧。
 
-| Situation | What a machine-specific implementation should achieve |
+## 具体使用场景
+
+| 你的情况 | 针对本机编写的方案应该做到 |
 | --- | --- |
-| One PC alternates between official OAuth and an API-compatible relay | Switch route and credential as one transaction while keeping one evolving Codex configuration |
-| Several official accounts are used on the same Windows profile | Keep each OAuth snapshot protected and make account identity explicit before activation |
-| Several API providers expose different model catalogs | Bind endpoint, credential, model and proxy policy to each profile without cloning the whole config |
-| Plugins, MCP servers, skills or hooks are edited frequently | Start every switch from the live configuration so unrelated changes survive |
-| Old local conversations contain provider names from earlier relay definitions | Inventory active and archived history, then normalize every proven local provider field to `openai` before cross-mode use |
-| Relay-created conversations fail when resumed through the official endpoint | Prepare response-item compatibility separately from provider normalization, preserve valid records and keep a tested rollback manifest |
-| The first turn repeatedly reconnects or times out | Diagnose HTTPS, WebSocket, base-path and system-proxy behavior instead of blaming auth or history blindly |
-| No official OpenAI login has ever existed on the machine | Preserve the known API state, stage the official route, let the user complete OAuth, restart Codex and verify the resulting official session before capturing it |
-| No relay/API profile or key has ever been configured | Ask for non-secret endpoint and model choices, provide a local secret-entry path, restart Codex and verify the real route before calling the profile ready |
-| Some settings are observable only after a Codex restart | Persist a bootstrap checkpoint, tell the user exactly what to do next, and continue post-restart verification instead of claiming success in one pass |
-| CC Switch or another tool also writes Codex's live config | Select one configuration owner, close the others, and ask the user to save one verified complete config before the first write |
-| `config.toml` is emptied, reduced to a generic template, or loses tables | Provide both known-good rollback and no-backup offline reconstruction without depending on a working Codex conversation |
-| The user wants several relays without CC Switch | Optionally implement relay profiles whose endpoint, protected credential, model and proxy policy patch the live config instead of replacing it |
+| 一台电脑需要来回使用官方 OAuth 和 API 中转 | 把路由与认证作为一次事务切换，同时保留一份持续更新的 Codex 配置 |
+| 同一个 Windows 用户需要使用多个官方账号 | 分别保护每个 OAuth 快照，启用前明确显示将要使用的账号身份 |
+| 多个 API 供应商提供的模型不同 | 把接口、凭据、模型和代理策略绑定到各自档案，不复制整份配置 |
+| 插件、MCP、Skills 或钩子经常变化 | 每次都从实时配置出发，让无关的新设置在切换后继续存在 |
+| 本地旧对话仍带有早期中转定义留下的不同 provider 名称 | 盘点当前及归档历史，再把已经确认属于本地会话的 provider 字段统一为 `openai` |
+| 中转产生的旧对话切到官方后无法续聊 | 把响应项目编号兼容与 provider 统一分开处理，保留有效记录，并生成经过验证的回滚清单 |
+| 每个任务第一条消息反复重连或超时 | 分层检查 HTTPS、WebSocket、接口路径和系统代理，不盲目归因于账号或历史 |
+| 这台电脑从未登录过 OpenAI 官方账号 | 先保护当前 API 状态，再切到官方路线，由用户完成 OAuth，重启 Codex 并验证真实官方会话后才保存 |
+| 这台电脑从未配置过中转／API 地址和密钥 | 询问不含密钥的接口与模型选择，提供本地密钥输入入口，重启 Codex 并验证真实路线后才把档案标成可用 |
+| 某些配置只有重启 Codex 后才能看出是否生效 | 在重启前保存首次初始化检查点，明确告诉用户下一步，重启后继续验证，不能一次检查就宣布完成 |
+| CC Switch 或其他工具也会改写 Codex 的实时配置 | 先确定唯一配置写入者，停止并退出其他管理器；切换前由用户保存一份已验证可用的完整配置 |
+| <code>config.toml</code> 被清空、缩成通用模板或丢失部分表 | 不依赖已经坏掉的 Codex 会话，提供“有备份回滚”和“无备份离线重建”两条救援路线 |
+| 希望完全不用 CC Switch 来切换多个中转站 | 可选实现多中转档案，把地址、模型、代理策略和受保护凭据绑定到档案，只补丁式修改实时配置 |
 
-This guide is not intended to sync cloud ChatGPT conversations, bypass account policy, share credentials between people, or provide a universal executable that assumes every Codex release has the same storage layout.
+本指南不用于同步云端 ChatGPT 会话、绕过账号规则、在人与人之间分享凭据，也不提供一个假设所有 Codex 版本存储结构都相同的通用程序。
 
-## Deploy in one prompt
+## 一句话部署
 
-Copy this sentence into a new Codex task:
+把下面这段复制到一个新的 Codex 任务中：
 
 ~~~text
-Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide and begin with a read-only inspection of this Windows machine's Codex version, effective configuration, authentication type, local history stores, network routes, and external managers such as CC Switch that may rewrite `config.toml`. Make me choose one configuration owner and remind me to save one complete config that has passed a real request before the first write; do not create an unbounded backup archive. Then design and build a rollback-first switcher tailored to this machine for official OAuth accounts and API-compatible providers. Explicitly handle a missing official login, a missing relay/API setup, and offline recovery after the config is emptied or reduced to a generic template; if Codex cannot converse, permit recovery through local PowerShell or another coding agent. Use local secret entry rather than asking for keys in chat, preserve the live config's plugins, MCP servers, skills, hooks, permissions and projects, and, if I choose, support several relay profiles with their own protected credentials, models and proxy policies so CC Switch is not required; never store a full `config.toml` per profile. Use `model_provider = "openai"` for both official and API-compatible profiles only after proving that contract on the installed Codex build. Make history preparation a separate operation: scan every active and archived local rollout plus every relevant SQLite store, report distinct provider values without exposing conversation text, and, after my confirmation and a full Codex shutdown, use verified backups and a field-level rollback manifest to normalize all semantically equivalent local provider metadata to `openai`; keep cloud ChatGPT Work/Chat records out of scope, keep response-item ID repair separate, and ensure future sessions are also created as `openai`. Implement first use as persistent restart checkpoints because some values can only be verified after Codex fully restarts, pause for my confirmation before changing live credentials or conversation history, and finally validate every post-restart state, profile switching, rollback, network behavior, new-session metadata and representative old-conversation resume in both modes.
+Codex，请按 https://github.com/IIMovoMII/codex-auth-switching-field-guide 为这台 Windows 电脑构建一套官方 OAuth 账号／API 中转切换方案。先只读盘点 Codex 版本、用户级生效配置、认证类型、历史存储、网络能力和所有可能改写 `config.toml` 的工具，向我报告起点、冲突和未知项；让我选择唯一配置写入者、需要的官方账号与中转档案，以及是否启用多中转。第一次写入前提醒我只保存一份经全新 Codex 进程真实请求验证的完整配置。实现时只补丁式管理路线、模型、代理和认证，不复制整份配置，必须保留插件、MCP、Skills、钩子、权限、项目和以后新增的未知字段；密钥只能由我在本机遮罩输入。不存在官方登录态或中转配置时，使用可跨完整重启继续的初始化检查点，不得伪造快照；失败、取消、凭据过期和配置损坏都要回到上一份可用档案，或停在证据完整的“需要人工检查”状态。只有当前版本与目标接口实测通过后，官方和兼容中转才共同使用 `model_provider = "openai"`。把历史准备做成独立、可选操作：先脱敏扫描当前及归档的本地 JSONL 和相关 SQLite；经我再次确认且所有 Codex 写入者完全退出后，使用数据库感知备份与字段级回滚清单统一已确认的本地 provider，云端 ChatGPT Work／Chat 不得修改，响应项目编号兼容必须单独判断。安装第三方程序、改变当前认证或修改历史前都要单独征得我同意；最后验证每个重启检查点、档案增删改切、配置保留、网络路线、新会话元数据、代表性旧会话续聊和故障回滚，并给出离线恢复入口。
 ~~~
 
-This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
+这里的“部署”是把任务一次性交给 Codex，不是下载通用安装包。这句话允许 Codex 做只读检查并编写本机方案，但不允许它静默安装第三方程序、公开凭据或未经确认修改历史。
 
-## Architecture
+## 总体结构
 
 ~~~mermaid
 flowchart LR
-    U[Requested profile] --> P[Preflight and process barrier]
-    P --> F[Read the live configuration]
-    F --> M[Patch only owned fields]
-    M --> A[Activate protected credential snapshot]
-    A --> V[Validate route, auth, model and history gate]
-    V --> C[Commit transaction]
-    V -->|failure| R[Field-level rollback]
+    U[选择目标档案] --> P[预检查并确认 Codex 已退出]
+    P --> F[读取当前实时配置]
+    F --> M[只修改切换器负责的字段]
+    M --> A[启用受保护的认证快照]
+    A --> V[验证路由、认证、模型和历史门禁]
+    V --> C[提交本次切换]
+    V -->|失败| R[按字段回滚]
 
-    H[Explicit history preparation] --> G[Compatibility fingerprint]
+    H[单独执行历史准备] --> G[生成兼容指纹]
     G --> V
 ~~~
 
-The switcher owns a narrow set of fields. Everything else remains live and keeps evolving.
+切换器只负责极少数字段，其他配置始终以 Codex 当前文件为准。
 
-| Concern | Recommended source of truth |
+| 内容 | 建议的唯一依据 |
 | --- | --- |
-| Plugins, MCP, skills, hooks, permissions | Current live Codex configuration |
-| Active endpoint and model | Selected profile, applied as a surgical patch |
-| Active credential | Codex credential file or supported secure store |
-| Inactive credentials | OS-protected snapshots, never plain project files |
-| Conversation compatibility | Separate, explicit preparation record |
-| Recovery | Durable transaction journal plus verified backups |
+| 插件、MCP、Skills、钩子、权限 | Codex 当前实时配置 |
+| 当前接口和模型 | 所选档案，只做字段级修改 |
+| 当前凭据 | Codex 支持的认证文件或安全存储 |
+| 未启用的凭据 | 操作系统保护的快照，不放进项目目录 |
+| 对话兼容情况 | 单独生成的历史准备记录 |
+| 故障恢复 | 持久事务日志与经过验证的备份 |
 
-## Core design rules
+## 十条核心原则
 
-1. **Discover before designing.** Codex configuration, storage, process names and transport behavior change across releases.
-2. **Never swap the whole configuration.** Patch only the fields the switcher explicitly owns.
-3. **Separate routing, authentication and history.** They interact, but they are different state domains.
-4. **Stop writers before sensitive changes.** Configuration, credentials and history should not be mutated while Codex processes can append or reload them.
-5. **Make first use a real workflow.** Detect whether the machine starts in official, API or inconsistent state; do not invent a missing credential snapshot.
-6. **Keep history repair out of the fast path.** Inventory and normalize historical provider identity once, run response-item repair separately, then use a cheap fingerprint gate during switching.
-7. **Journal before writing.** Every multi-file transition needs a recoverable previous state.
-8. **Verify the route, not just the TOML.** A syntactically valid profile can still use the wrong credential, proxy, transport or model.
-9. **Give the live config exactly one writer.** CC Switch and a custom switcher must not alternate ownership.
-10. **Keep configuration recovery executable offline.** A broken Codex conversation cannot be the only repair interface.
+1. **先检查，再设计。** Codex 的配置、存储、进程和网络行为会随版本变化。
+2. **不要交换整份配置。** 只修改切换器明确管理的字段。
+3. **把路由、认证、历史分开。** 三者有关联，但不是同一件事。
+4. **写入前停止所有写入者。** 修改认证或历史时，Codex Desktop 和 CLI 都应完全退出。
+5. **第一次使用必须有完整流程。** 先判断当前是官方、API 还是矛盾状态，不能伪造不存在的认证快照。
+6. **历史修复不应塞进每次切换。** 先单独盘点并统一旧 provider，再独立处理响应项目编号，保存指纹后只在历史改变时重新准备。
+7. **先记日志，再写文件。** 多文件切换必须能够恢复到开始前的状态。
+8. **验证实际路线，而不只是检查配置文字。** 配置能解析，不代表账号、代理、传输方式和模型真的正确。
+9. **实时配置只能有一个写入者。** CC Switch 与自建切换器不能同时拥有同一个 <code>config.toml</code>。
+10. **配置救援必须能离线执行。** 如果 Codex 已无法对话，仍要能用备份、本地脚本或另一个编程智能体恢复。
 
-## First-use decision tree
+## 第一次使用
 
 ~~~mermaid
 flowchart TD
-    S[Inspect current machine] --> K{Current state is consistent?}
-    K -->|No| X[Stop and explain the mismatch]
-    K -->|Yes, official| O[Register official state]
-    K -->|Yes, API| A[Register API state]
-    O --> L[Ask the user to perform one intentional API login/setup]
-    A --> L2[Ask the user to perform one intentional official login]
-    L --> P[Capture the second state only after validation]
+    S[检查当前电脑] --> K{当前状态是否一致}
+    K -->|否| X[停止并说明冲突]
+    K -->|是：官方| O[登记当前官方状态]
+    K -->|是：API| A[登记当前 API 状态]
+    O --> L[引导用户有意完成一次 API 配置]
+    A --> L2[引导用户有意完成一次官方登录]
+    L --> P[验证后保存第二套状态]
     L2 --> P
-    P --> R[Profiles are ready]
+    P --> R[档案准备完成]
 ~~~
 
-The arrows are restart checkpoints, not one uninterrupted inspection. Stage the intended change, save progress, fully restart Codex, verify what the fresh process actually loaded, and only then advance to the next phase.
+图里的箭头代表可以跨越 Codex 重启的检查点，不是一次不中断的检查。每一阶段都应先写入准备状态并保存进度，完全重启 Codex，再验证新进程实际加载了什么，确认后才能进入下一阶段。
 
-A switcher cannot create an official OAuth session that has never existed, nor should it ask a model to read secrets. On first use, it records the known-good current state, guides the user through one intentional setup of the missing mode, validates it, and only then creates the second protected snapshot.
+切换器不能凭空创造从未登录过的官方 OAuth，也不应让模型读取密钥。第一次使用时，应先保存当前已经验证成功的状态，再由用户主动完成另一种登录或接口配置；验证无误后，才保存第二套受保护快照。
 
-## CC Switch, config ownership and emergency recovery
+## CC Switch、配置所有权与紧急恢复
 
-Treat CC Switch and a custom Codex switcher as incompatible owners of the same live `config.toml`. A real user incident left Codex unable to converse after an external switch, but the exact version and before/after files were not retained, so this guide does not claim that every current CC Switch release corrupts configuration.
+本指南建议把 CC Switch 与自建 Codex 切换器视为**配置所有权不兼容**，不能交替改写同一个实时 <code>config.toml</code>。这里不是说当前每个 CC Switch 版本都会损坏配置：之前发生过一次“切换后配置不完整、Codex 无法对话”的真实事件，但当时没有保留损坏前后文件和确切版本，因此不能伪造精确根因。
 
-The source-level conflict is still observable: CC Switch describes its database/profile state as authoritative and projects selected configuration text into the live Codex file. Current releases include backfill and common-config protections, but that does not prove preservation of every field added by a different owner. See the pinned [configuration model](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/docs/user-manual/zh/5-faq/5.1-config-files.md#L295-L322), [switch flow](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L4931-L4942) and [live write path](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/codex_config.rs#L864-L880).
+能够从当前源码确认的是：CC Switch 把自己的数据库／档案当作主要状态，并在切换时把目标档案的配置文本写回 Codex 实时文件。当前版本已有回填和通用配置保护，但这仍不能证明它会无条件保留另一个切换器新增的全部字段。可核对 [CC Switch 的配置模型](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/docs/user-manual/zh/5-faq/5.1-config-files.md#L295-L322)、[切换流程](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L4931-L4942) 和 [写入实时配置的实现](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/codex_config.rs#L864-L880)。
 
-Before the custom switcher writes anything, ask the user to save one complete `config.toml` that has passed a real request from a fresh Codex process. This may be one bounded, user-managed recovery point; an ever-growing automatic archive is not required. Then close CC Switch and disable its Codex config writes.
+开始使用自建切换器前，应让用户主动保存**一份**已经在全新 Codex 进程中完成真实请求的完整 <code>config.toml</code>。这是有上限的人工恢复点，不要求脚本无限累计备份。随后完全退出 CC Switch，并关闭它对 Codex 配置的后台或开机写入。
 
-If the live config is empty, malformed, or reduced to a generic/common template, stop every writer before another switch. Restore the full known-good structure, then reapply only route fields for the currently active auth. Without a backup, reconstruct a minimal parseable file from the installed version's official reference and add verified plugin, MCP, skill, hook, permission and project keys one subsystem at a time. When Codex cannot converse, use offline PowerShell or another coding agent such as Claude, without exposing credentials. The complete playbook is in [config recovery and external writers](references/config-recovery.md).
+如果配置被清空、被写成只剩通用／公用字段的模板，或者插件、MCP、Skills、钩子等表消失：
 
-## Optional multi-relay profiles without CC Switch
+1. 立刻停止 Codex、CLI、CC Switch、自建切换器和所有可能写配置的辅助进程，不要再次点击切换；
+2. 私下保留损坏文件的大小与哈希；需要定位时可以另存损坏文件，但不能提交到公开仓库；
+3. 有可用备份时，以完整备份恢复结构，再根据当前实际认证只重写路由字段：官方模式移除中转地址，API 模式写回对应中转地址和该中转支持的模型；
+4. 没有备份时，根据当前 Codex 版本的官方配置说明，从最小可解析配置开始，逐项找回插件、MCP、Skills、钩子、权限和项目字段；无法确认的值必须标成未知，不能猜；
+5. 如果 Codex 已经无法开启对话，就用离线 PowerShell，或让 Claude 等另一个编程智能体检查脱敏后的结构并修复；不要把密钥交给模型；
+6. 解析暂存文件、原子写回、再次解析，然后完全重启 Codex，验证真实路线、认证、模型、插件与一个新对话；旧对话另走历史兼容流程。
 
-A user may choose to put several relays directly into the generated script or small app. Each profile carries its endpoint, protected credential reference, preferred model, optional fallbacks and proxy policy—not a copied full config. A switch starts from the live file and patches only verified route/model/proxy fields while activating the matching credential in the same transaction.
+完整故障分类、两种回滚路线和 <code>Model provider '&lt;name&gt;' not found</code> 的处理见 [配置恢复与外部写入者](references/config-recovery.md)。
 
-Provider-specific models are therefore expected rather than problematic. If a saved model is unavailable, stop and ask the user to choose; never substitute silently. Suggested independent actions include adding/updating official or relay profiles, switching, read-only config checks, history preparation and recovery. See [optional multi-relay profiles](references/multi-relay-profiles.md) for the field model and transaction boundary.
+## 可选：完全不用 CC Switch 切换多个中转站
 
-## One provider identity for old and new local conversations
+公开经验允许每个使用者选择把多中转站支持做进自己的脚本或小应用；本指南不要求所有本机实现都启用。每个中转档案只保存自己的意图：显示名称、接口地址、受保护的凭据引用、首选模型、候选模型、代理策略和最后验证版本，**不能复制整份 <code>config.toml</code>**。
 
-For the official-plus-API-compatible architecture described here, the preferred target is:
+正式切换时始终读取当前实时配置，只改 <code>model_provider</code>、顶层 <code>openai_base_url</code>、<code>model</code> 以及当前版本实测过的代理／传输字段，再把对应凭据作为同一个事务启用。不同中转站模型不一样并不是冲突：模型属于各自档案；如果模型失效，应停止并让用户选择，不能静默换成另一个模型。
+
+建议提供“添加官方账号”“添加中转站”“更新档案”“切换档案”“只读配置检查”“历史准备”“恢复”等独立入口。第一次添加中转站时在本地遮罩输入密钥，完全重启后用真实请求验证；第一次添加官方账号时必须由用户真正完成 OAuth。详细字段、命令边界和切换事务见 [多中转档案设计](references/multi-relay-profiles.md)。
+
+## 让新旧本地对话共用一个 provider 身份
+
+这份指南描述的“官方账号＋API 兼容接口”结构，建议把共同目标固定为：
 
 ~~~toml
 model_provider = "openai"
 ~~~
 
-Official mode removes `openai_base_url`; an API-compatible profile sets that top-level override and activates its own credential. The current [Codex configuration reference](https://developers.openai.com/codex/config-reference) identifies `openai` as the built-in default provider and `openai_base_url` as its endpoint override. Do not try to redefine the reserved built-in provider with a `[model_providers.openai]` table.
+官方模式不保留 `openai_base_url`；API 兼容档案则写入这个顶层地址覆盖，并启用自己的凭据。当前 [Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference) 把 `openai` 列为内置默认 provider，也把 `openai_base_url` 定义为它的接口地址覆盖。不要再用 `[model_providers.openai]` 表去重新定义这个保留名称。
 
-Before relying on that layout, prove it on the installed Codex build and intended endpoint. Then run a separate history-preparation operation:
+必须先在当前 Codex 版本和目标接口上实测这个结构，再单独执行历史准备：
 
-1. scan active and archived local JSONL plus every relevant SQLite store and count each provider value;
-2. distinguish local rollouts from cloud ChatGPT Work/Chat records;
-3. fully stop every Codex writer, create database-aware backups and write a rollback manifest;
-4. structurally normalize every proven local provider field to `openai`, not only the first metadata line;
-5. validate JSONL, SQLite, new-session metadata and representative old-session resume in both official and API-compatible modes.
+1. 扫描当前及归档的本地 JSONL 和全部相关 SQLite，统计每种 provider 的数量；
+2. 区分本地会话与云端 ChatGPT Work／Chat 记录，后者不在修改范围；
+3. 完全退出所有可能写入 Codex 状态的进程，建立数据库感知备份和回滚清单；
+4. 按结构把已经确认的所有本地 provider 字段统一为 `openai`，不能只改 JSONL 第一行；
+5. 验证 JSONL、SQLite、以后新建会话的元数据，以及代表性旧对话在官方和 API 模式下都能续聊。
 
-Provider normalization makes local conversation identity consistent. It does not repair incompatible historical response-item IDs; run that semantic check in the same preparation phase but as a separate repair rule.
+provider 统一解决的是本地会话身份一致性，不会顺便修好历史响应项目编号。两项检查可以放在同一次历史准备里，但必须使用两套独立的判断和修复规则。
 
-## Guide map
+## 阅读路线
 
-| Read this | When you need to |
+| 文档 | 用途 |
 | --- | --- |
-| [Discovery](references/discovery.md) | Inventory Codex, configuration, credentials, history and endpoint capabilities |
-| [Architecture](references/architecture.md) | Define profile ownership, first-use flow and transactions |
-| [First use and restart checkpoints](references/first-use-bootstrap.md) | Initialize a missing official or API state across the required Codex restarts |
-| [Config recovery and external writers](references/config-recovery.md) | Handle CC Switch ownership conflicts, empty/template configs and offline repair |
-| [Optional multi-relay profiles](references/multi-relay-profiles.md) | Build official-account and multi-relay switching with profile-specific models and credentials |
-| [History compatibility](references/history-compatibility.md) | Keep local conversations resumable across auth modes |
-| [Network diagnostics](references/network-diagnostics.md) | Separate HTTPS, WebSocket, relay and system-proxy failures |
-| [Safety and rollback](references/safety-and-rollback.md) | Protect credentials and recover from interrupted writes |
-| [Validation](references/validation.md) | Build a test matrix before trusting the switcher |
+| [环境检查](references/discovery.md) | 盘点 Codex、配置、认证、历史和接口能力 |
+| [总体设计](references/architecture.md) | 设计字段归属、首次使用和切换事务 |
+| [首次初始化与重启检查点](references/first-use-bootstrap.md) | 在缺少官方或 API 状态时，跨必要的 Codex 重启完成初始化 |
+| [配置恢复与外部写入者](references/config-recovery.md) | 处理 CC Switch 所有权冲突、配置清空／模板化和离线救援 |
+| [多中转档案设计](references/multi-relay-profiles.md) | 可选实现官方账号与多个中转站的独立模型、凭据和代理策略 |
+| [历史兼容](references/history-compatibility.md) | 让本地旧对话跨认证模式继续使用 |
+| [网络诊断](references/network-diagnostics.md) | 区分 HTTPS、WebSocket、中转与系统代理问题 |
+| [安全与回滚](references/safety-and-rollback.md) | 保护凭据并处理切换中断 |
+| [验证清单](references/validation.md) | 建立可信的测试矩阵 |
 
-## Hard-won lessons
+## 实战中最容易踩的坑
 
-- A provider label can affect how local conversations are discovered even when the effective endpoint comes from another setting; fixing only future configuration leaves old mixed-provider sessions behind.
-- Provider identity can be repeated in session metadata, thread-settings events and SQLite thread rows. Normalization must cover every semantic copy discovered for that build.
-- A relay that accepts HTTPS Responses requests may still reject or omit the Responses WebSocket route.
-- Repeated reconnect messages on the first turn can be a transport fallback symptom, not a damaged conversation.
-- OAuth and API credentials may share a live storage location; configuration switching alone does not switch identity.
-- A valid pre-restart file is only a staged intention. Values that Codex loads at process start must be verified from a fresh process before the profile is marked ready.
-- A historical response item with a generic identifier is not automatically valid for an official endpoint that expects a typed identifier.
-- Reasoning records are special: if their required protected content cannot be recovered, deleting the model-input copy can be safer than fabricating an identifier.
-- SQLite databases using WAL require database-aware backup and integrity checks.
-- Equal-length in-place JSONL edits can reduce risk in a narrowly proven case, but a stopped-writer repair remains the default.
-- A full history scan on every switch creates delay without improving safety. Prepare once, fingerprint, then re-prepare only after the history changes.
-- Version-sensitive feature flags must be probed after upgrades rather than treated as permanent facts.
-- CC Switch and a custom switcher may both believe they own the live configuration; never alternate them on the same file.
-- Once a config has collapsed to a generic template, another switch can erase more evidence. Stop writers and recover offline first.
-- Multiple relays do not require multiple full configs. Keep relay-specific models and credentials in profiles while preserving the live file.
+- 即使实际接口由另一个字段决定，provider 名称仍可能影响本地对话能否被发现；只修以后新会话，会漏掉历史里混杂的旧名称。
+- provider 身份可能同时出现在会话元数据、重复的线程设置事件和 SQLite 线程行中，统一时必须覆盖当前版本中发现的每一份语义副本。
+- 中转站支持 HTTPS Responses，不代表它也支持 Responses WebSocket。
+- 每个任务第一条消息反复重连，可能只是传输方式回退，不一定是对话损坏。
+- OAuth 和 API Key 可能共用一个当前认证位置；只换配置并不会自动换身份。
+- 重启前文件内容正确，只能证明“准备写对了”；凡是 Codex 在进程启动时加载的内容，都必须用新进程验证后才能把档案标成就绪。
+- 中转返回的通用响应编号，不一定符合官方接口对不同项目编号前缀的要求。
+- reasoning 记录不能随意改编号；如果缺少目标接口要求的受保护内容，从模型输入历史中移除它，往往比伪造编号更安全。
+- 使用 WAL 的 SQLite 数据库不能靠直接复制正在使用的文件来备份。
+- 只有在已经证明长度相同、偏移准确且并发行为安全时，才考虑定点修改 JSONL；默认仍应先停止 Codex。
+- 每次切换都扫描全部历史只会拖慢流程。完整检查应独立执行，正式切换只核对指纹。
+- 开发中功能和代理开关都可能随 Codex 升级改变，升级后必须重新实测。
+- CC Switch 与自建切换器都可能认为自己有权写实时配置；二者不能轮流控制同一个文件。
+- 配置被压缩成通用模板后，继续点击切换可能覆盖更多线索；先停止所有写入者，再走离线恢复。
+- 多中转站不需要多份完整配置；把模型和凭据绑定到中转档案，其他设置继续来自实时配置。
 
-## Using this with a coding agent
+## 如何交给编程智能体使用
 
-Point the agent at [SKILL.md](SKILL.md) and ask it to design a switcher for the current machine. The agent should:
+让智能体阅读 [SKILL.md](SKILL.md)，并要求它针对当前电脑设计方案。一个合格的执行过程应当：
 
-1. perform read-only discovery;
-2. show the detected state without exposing secret values;
-3. propose a field-ownership and recovery model;
-4. obtain user confirmation before credential or history mutation;
-5. implement a local solution appropriate to the detected Codex build;
-6. run the full validation matrix.
+1. 先做只读检查；
+2. 只报告认证类型和一致性，不显示密钥内容；
+3. 明确哪些字段归切换器管理；
+4. 修改认证或历史前获得用户确认；
+5. 根据当前 Codex 版本写本地实现；
+6. 完整执行验证矩阵。
 
-The guide deliberately avoids distributing a ready-made credential manager. Local paths, Codex builds, relay behavior, account count and acceptable risk differ too much for blind installation to be responsible.
+这里故意不提供可以盲装的认证管理程序。不同电脑的路径、Codex 版本、中转能力、账号数量和风险承受范围差异很大，让每个人根据实际环境生成自己的实现更稳妥。
 
-## Scope
+## 适用范围
 
-The patterns are aimed at Codex Desktop and Codex CLI on Windows. They may help on other platforms, but path handling, process barriers, credential storage and filesystem semantics must be redesigned.
+本指南主要面向 Windows 上的 Codex Desktop 和 Codex CLI。其他平台可以参考思路，但进程关闭、凭据保护、路径和文件系统行为必须重新设计。
 
-An observed setup successfully used `openai` for both future and historical local provider metadata while changing only the top-level endpoint and credential state. That is evidence for a pattern, not a promise that the same history fields or semantics remain valid in every Codex release. Re-run discovery after upgrades.
+某个真实环境曾验证过：未来新会话和历史本地会话都统一使用 `openai` provider，只切换顶层接口地址与认证状态，可以让两种模式共享配置和历史。它证明了这种设计方向可行，但不保证未来所有 Codex 版本仍使用相同历史字段和规则。升级后请重新检查。
 
-## Security
+## 安全
 
-- Never commit <code>auth.json</code>, tokens, relay URLs containing credentials, or local state snapshots.
-- Do not print token values during diagnostics.
-- Protect inactive credentials with the operating system and restrict file permissions.
-- Before the first mutation, let the user privately save one complete, verified config; do not require an unbounded automatic backup history.
-- Keep a redacted audit trail of transitions.
-- Treat conversation files as private user data.
+- 绝不提交 <code>auth.json</code>、令牌、带凭据的中转地址或本地状态快照。
+- 诊断时不要输出密钥值。
+- 用操作系统保护未启用的认证快照，并限制文件权限。
+- 第一次修改前由用户私下保存一份已验证可用的完整配置；不要求持续生成无限历史备份。
+- 只保存脱敏后的切换记录。
+- 把对话历史视为用户隐私数据。
 
-See [SECURITY.md](SECURITY.md) before sharing logs or examples.
+分享日志或示例前，请先阅读 [SECURITY.md](SECURITY.md)。
 
-## Contributing
+## 参与改进
 
-Contributions should add reproducible observations, version context and a safe validation method. Avoid machine-specific code presented as universal behavior. See [CONTRIBUTING.md](CONTRIBUTING.md).
+欢迎补充能复现的现象、版本范围和安全验证方法。不要把某一台电脑适用的脚本描述成通用答案。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## License
+## 许可
 
-[MIT](LICENSE). The guide is provided without warranty; authentication and history migration remain the operator's responsibility.
+[MIT](LICENSE)。本指南不提供担保；认证和历史迁移的最终责任仍由实际操作者承担。

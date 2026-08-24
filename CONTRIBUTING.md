@@ -1,37 +1,39 @@
-# Contributing
+# 参与改进
 
-Contributions should improve the quality of the method, not turn this repository into a machine-specific credential switcher.
+> English: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
 
-## Good contributions
+贡献应改进方法本身，而不是把仓库变成只适用于某一台电脑的成品凭据切换器。
 
-- a reproducible Codex behavior with version and platform context;
-- a safer discovery or rollback pattern;
-- a synthetic history fixture that exposes a compatibility edge case;
-- a clearer first-use decision;
-- an additional validation case;
-- a correction backed by a minimal probe.
+## 适合提交的内容
 
-## Please avoid
+- 带 Codex 版本和平台背景的可复现行为；
+- 更安全的盘点、事务或回滚方法；
+- 能暴露兼容边界的合成历史样例；
+- 更清晰的首次使用决策；
+- 新的验证用例；
+- 有最小探针支撑的纠错。
 
-- API keys, OAuth files, private relay hosts or account identifiers;
-- real conversation content;
-- absolute local paths or usernames;
-- a script that assumes one person's Codex layout;
-- claims of universal support without version evidence;
-- generated bulk text that has not been technically reviewed.
+## 请不要提交
 
-## Pull request checklist
+- API Key、OAuth 文件、私有中转地址或账号标识；
+- 真实对话内容；
+- 本机绝对路径或用户名；
+- 假设所有人 Codex 目录结构相同的脚本；
+- 没有版本证据的“永远支持”结论；
+- 未经技术复核的批量生成文字。
 
-1. Explain the observed problem and environment.
-2. State whether the behavior is documented, measured or inferred.
-3. Add a safe way to validate the claim.
-4. Update both language pages when their shared meaning changes.
-5. Run:
+## 拉取请求检查单
+
+1. 说明观察到的问题和环境。
+2. 标明结论属于官方文档、实测还是推断。
+3. 提供安全的验证方法。
+4. 同步更新中文主文档；如果英文次选文档表达了同一事实，也一并更新。
+5. 运行：
 
 ~~~text
 python scripts/validate_pack.py
 ~~~
 
-6. Confirm that no credential or private host appears in the diff.
+6. 确认差异中没有凭据、私有主机或真实对话。
 
-By contributing, you agree that your contribution is licensed under the MIT License.
+提交贡献即表示同意按 MIT License 授权。

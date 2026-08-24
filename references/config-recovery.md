@@ -1,101 +1,103 @@
-# Config recovery and external config writers
+# 配置恢复与外部写入者
 
-Codex can fail before an in-app agent is available when the user-level `config.toml` is empty, malformed, or replaced by a partial provider template. Recovery must therefore have an offline path that does not depend on Codex Desktop being able to start a conversation.
+> English: [config-recovery.en.md](config-recovery.en.md)
 
-## Evidence boundary for CC Switch
+用户级 `config.toml` 被清空、语法损坏或替换成不完整模板时，Codex 可能在智能体可用前就无法继续。因此恢复必须能离线执行，不能依赖受损的 Desktop 对话。
 
-A user-observed incident found Codex unable to converse after CC Switch had changed the live configuration. The damaged before/after files and exact CC Switch version were not preserved, so this guide does not claim a reconstructed root cause or that every current CC Switch release corrupts Codex configuration.
+## 关于 CC Switch 的证据边界
 
-There is nevertheless a concrete ownership conflict in the current public design:
+曾有用户遇到 CC Switch 改写实时配置后 Codex 无法对话，但没有保留损坏前后文件和确切版本，因此本指南不伪造根因，也不声称当前每个 CC Switch 版本都会损坏配置。
 
-- CC Switch documents its database as the source of truth and the live configuration as output written during switching ([configuration model](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/docs/user-manual/zh/5-faq/5.1-config-files.md#L295-L322)).
-- Its switch path backfills the outgoing profile and writes the selected profile to the live file ([switch flow](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L4931-L4942)).
-- The Codex writer atomically replaces the live `config.toml` with the selected configuration text ([write path](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/codex_config.rs#L864-L880)).
-- Current releases contain backfill and common-configuration protections, but common-config synchronization is still an explicit profile operation rather than proof that every externally added field will always be retained ([common-config synchronization](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L5418-L5460)).
+当前公开源码仍能证明配置所有权冲突：
 
-This field guide uses the live Codex file as the source of truth and edits only declared route fields. The two ownership models must not control the same file.
+- CC Switch 把数据库称为单一事实源，切换时写入实时配置（[配置模型](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/docs/user-manual/zh/5-faq/5.1-config-files.md#L295-L322)）；
+- 切换流程会回填当前档案并把目标档案写到实时文件（[切换流程](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L4931-L4942)）；
+- Codex 写入器用目标文本替换实时 `config.toml`（[写入路径](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/codex_config.rs#L864-L880)）；
+- 新版本虽有回填与通用配置保护，但通用配置同步仍需要档案显式启用，不能证明另一个工具新增的所有字段都会保留（[同步条件](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L5418-L5460)）。
 
-> Choose one configuration writer. Do not let CC Switch and a custom live-config switcher both own the same `~/.codex/config.toml`.
+本指南则把 Codex 实时文件当作共同配置依据，只补丁式修改自管字段。两种所有权模型不能同时控制一个文件。
 
-If the user adopts the custom switcher described here, fully close CC Switch and disable any background or startup action that can rewrite Codex configuration. Import the required provider information deliberately; do not keep alternating between the two tools.
+> 只能选择一个配置写入者。不要让 CC Switch 和自建切换器共同拥有同一个 `~/.codex/config.toml`。
 
-## Before introducing any switcher
+采用自建切换器后，应完全退出 CC Switch，并关闭它针对 Codex 的后台／开机写入；只把用户确认的档案信息有意迁入新方案，不能继续交替使用。
 
-Ask the user to save one known-good copy of the complete live configuration before the first write. The copy must:
+## 引入切换器之前
 
-- come from a state in which Codex has actually completed a request after a fresh restart;
-- be stored outside the public repository and outside any directory an external config manager rewrites;
-- preserve the complete file, including plugins, MCP servers, skills, hooks, permissions, projects, comments and unknown future keys;
-- never include `auth.json`, OAuth tokens or API keys in source control;
-- be replaced only after the user has deliberately accepted and tested a newer configuration.
+提醒用户主动保存一份完整的已知良好配置。它应当：
 
-This is a recovery checkpoint, not a requirement to accumulate unlimited generations. One user-managed known-good copy is a valid bounded policy. A script may offer an optional backup command, but it must not silently create an ever-growing archive.
+- 来自在全新 Codex 进程中完成过真实请求的状态；
+- 存放在公开仓库和外部配置管理器控制目录之外；
+- 包含插件、MCP、技能、钩子、权限、项目、注释和未知新字段；
+- 不与 `auth.json`、OAuth 令牌或 API Key 一起提交；
+- 只有用户明确接受并验证新配置后才替换。
 
-## Recognizing damage
+这是一份有上限的人工恢复点，不要求积累无限版本。脚本可以提供可选备份入口，但不能静默制造不断增长的归档。
 
-Treat any of these as a recovery event, not as an ordinary profile switch:
+## 判断配置已经受损
 
-- `config.toml` is empty, missing or cannot be parsed;
-- the file suddenly shrank to a small generic or common-provider template;
-- previously present plugin, MCP, skill, hook, feature, permission or project keys disappeared;
-- Codex reports that a referenced provider does not exist;
-- route and credential type contradict each other;
-- Codex opens but every request fails immediately after another config manager switched profiles.
+以下情况进入恢复流程，而不是普通切换：
 
-Do not press another switch button in the hope that it will repair the file. Another projection may overwrite more evidence.
+- `config.toml` 为空、缺失或无法解析；
+- 文件突然缩成很小的通用／公用模板；
+- 原有插件、MCP、技能、钩子、功能、权限或项目字段消失；
+- Codex 报告引用的 provider 不存在；
+- 路线与认证类型矛盾；
+- 外部管理器切换后，Codex 能打开却立即无法请求。
 
-## Offline recovery with a known-good config
+不要反复点击切换碰运气，下一次投射可能覆盖更多线索。
 
-1. Fully stop Codex Desktop, Codex CLI, CC Switch, the custom switcher and every helper that may write `CODEX_HOME`.
-2. Record the Codex version, damaged file size and a hash. If the user wants diagnostic evidence, copy the damaged file to a separate private location; never publish its values.
-3. Check that the known-good copy is complete and parses as TOML. Compare key paths, not secret values.
-4. Decide which authentication is currently active without exposing credential contents: official OAuth or API key. Configuration recovery does not itself convert one credential type into the other.
-5. Restore the known-good file as the structural base.
-6. Reapply only the route fields required by the active authentication:
-   - official route: use the verified built-in provider identity and remove the relay override;
-   - API-compatible route: use the verified built-in provider identity, set the intended endpoint override and select a model supported by that relay.
-7. Parse the staged result, write it atomically, parse the live file again and confirm that unrelated key paths still exist.
-8. Start a fresh Codex process. Verify effective route, auth type, model, plugins, MCP, skills, hooks, permissions and one new conversation before accepting the recovered file as good.
-9. Resume a representative old local conversation only after the history compatibility gate has passed.
+## 有已知良好配置时离线回滚
 
-For a Codex build and relay that have passed this guide's shared-provider probe, the route-only difference is conceptually:
+1. 完全停止 Desktop、CLI、CC Switch、自建切换器和所有可能写 Codex 主目录的辅助程序。
+2. 记录 Codex 版本、损坏文件大小和哈希；用户需要定位证据时可私下另存损坏文件，不能公开值。
+3. 解析已知良好配置并比较字段路径，而不是秘密值。
+4. 不暴露内容地确认当前真实认证是官方 OAuth 还是 API Key；恢复配置本身不会转换认证类型。
+5. 用已知良好文件恢复完整结构。
+6. 根据当前认证只重写路线字段：官方路线使用已验证的内置身份并移除中转覆盖；API 兼容路线写回目标接口地址和该中转真实支持的模型。
+7. 解析暂存结果、原子写回、再次解析，并确认无关字段仍存在。
+8. 启动全新 Codex，验证路线、认证、模型、插件、MCP、技能、钩子、权限和一个新任务。
+9. 历史门禁通过后，才续聊代表性旧任务。
+
+已通过共同身份探针的概念差异只有：
 
 ~~~toml
-# Official OAuth profile
+# 官方 OAuth 档案
 model_provider = "openai"
 ~~~
 
 ~~~toml
-# API-compatible relay profile
+# API 兼容中转档案
 model_provider = "openai"
 openai_base_url = "https://relay.example/v1"
 model = "relay-supported-model"
 ~~~
 
-These fragments are not complete replacement configs. They are fields to merge into the restored live file. The [official Codex configuration reference](https://developers.openai.com/codex/config-reference) is authoritative for the installed release. Do not create a `[model_providers.openai]` table to redefine the reserved built-in provider.
+这些只是要合并的路线字段，不是完整替换配置。以当前 [Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)为准，不得定义 `[model_providers.openai]`。
 
-## Recovery when no good config exists
+## 完全没有可用配置时
 
-Deleted values cannot be recovered exactly from nothing. The goal becomes controlled reconstruction:
+已经删除的值不可能凭空精确恢复，只能受控重建：
 
-1. Keep every writer stopped and preserve the damaged file privately.
-2. Use the installed Codex version's configuration reference and startup diagnostics to build the smallest parseable configuration for the active authentication.
-3. Recover non-secret key paths from trustworthy local evidence: project documentation, exported plugin/MCP lists, hook files, version-controlled project settings and user-confirmed recollection. Never scrape tokens into a prompt.
-4. Add one subsystem at a time and restart when the installed build only loads that setting at process start.
-5. Test a new disposable conversation before touching local history.
-6. When Codex itself cannot converse, run a local offline PowerShell repair tool or use another coding agent such as Claude to inspect and reconstruct the file. Give that agent file paths and redacted structure, not credential values.
-7. After the reconstructed file passes a real request and subsystem checks, ask the user to save it as the new known-good copy.
+1. 停止全部写入者并私下保留损坏文件。
+2. 依据当前 Codex 版本的配置说明和启动诊断，先建立与当前认证匹配的最小可解析配置。
+3. 从可信本地证据恢复非秘密字段：项目文档、导出的插件／MCP 清单、钩子文件、版本库设置和用户确认的记忆。
+4. 每次只恢复一个子系统；当前版本要求启动时加载的字段，每次都用新进程验证。
+5. 先测试一个可丢弃的新任务，再接触本地历史。
+6. Codex 无法对话时，使用本地 PowerShell，或让 Claude 等另一个编程智能体读取文件路径和脱敏结构；不得把凭据值发给它。
+7. 真实请求和子系统检查通过后，让用户把重建结果保存为新的已知良好配置。
 
-An agent must say which values were reconstructed, which were user-supplied and which remain unknown. It must never invent deleted MCP commands, hook paths, provider URLs or models.
+报告必须区分“从证据恢复”“由用户补充”“重新创建”和“仍未知”，不能猜测丢失的 MCP 命令、钩子路径、接口地址或模型。
 
-## Recovering a provider-not-found failure
+## 处理 provider 不存在
 
-If Codex reports `Model provider '<name>' not found`, inspect the top-level `model_provider` and the matching provider definition before changing authentication. For the shared official/API-compatible design in this guide, both routes should use the verified built-in name `openai`; official mode omits `openai_base_url`, while a relay profile adds the top-level override. A stale custom name such as `relay` without a corresponding table is a configuration error, not an OAuth failure.
+出现 `Model provider '<name>' not found` 时，先检查顶层 `model_provider` 和对应定义，不能先动认证。
 
-After repairing the live config, restart Codex. Existing local history may still contain the stale provider name; repair that separately through the stopped-writer history-preparation workflow rather than global text replacement.
+本指南的共同方案中，官方与 API 兼容路线都使用经过验证的内置 `openai`；官方移除 `openai_base_url`，中转添加顶层覆盖。残留的 `model_provider = "relay"` 又没有对应表，是配置错误，不是 OAuth 失效。
 
-## What the custom switcher should do about external writers
+修好实时配置后必须重启。旧本地历史仍可能带残留 provider，要通过停写历史准备单独处理，不能全局替换。
 
-A machine-specific implementation may add a preflight warning that detects known config-manager processes and refuses a write while one is running. This is a concurrency guard, not a guarantee that a background process is absent. The durable rule is organizational: one tool owns live routing changes, every other tool is closed and no longer used for that file.
+## 自建切换器应提供的保护
 
-The switcher should also offer a read-only `config check` action that parses the live file and reports missing expected key paths without printing values. Recovery and backup remain explicit user actions; ordinary profile switching must stay fast and must not silently rewrite unrelated configuration.
+可以增加只读 `config check`：解析实时配置、显示缺失的预期字段路径但不显示值；也可以在已知外部管理器进程运行时拒绝写入。进程名检查只是辅助，真正规则仍是用户只选择一个写入者。
+
+备份与恢复必须是显式动作；普通切换要保持快速，只改自管字段。恢复完成后必须经过“解析成功 → 新进程真实请求 → 关键子系统 → 新任务 → 代表性旧任务”的完整验收，之后才能恢复普通切换。

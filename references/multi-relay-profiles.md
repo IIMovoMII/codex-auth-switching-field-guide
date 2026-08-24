@@ -1,137 +1,94 @@
-# Optional multi-relay switching without CC Switch
+# 多中转档案设计
 
-Some users need official OAuth plus several API-compatible relays, each with different models, credentials and proxy behavior. A machine-specific switcher can support that directly. This is an optional implementation path, not a feature every deployment must enable.
+[English](multi-relay-profiles.en.md)
 
-## Profile model
+这部分是可选能力。只有用户确实需要在多个中转站之间切换时才实现；单个中转站不必为了“看起来完整”增加额外复杂度。
 
-Store intent per profile instead of storing a complete `config.toml`:
+## 档案保存什么
 
-~~~text
-profile_id
-display_name
-kind: official | api_compatible
-official_account_hint (non-secret)
-base_url (API profile only, no embedded credential)
-credential_snapshot_reference
-preferred_model
-optional_fallback_models
-proxy_policy
-transport_policy, only if verified on this Codex build
-last_validated_codex_version
-last_validated_at
-ready: true | false
-~~~
+每个档案只保存切换意图，不保存整份 `config.toml`：
 
-The profile manifest must not contain an API key, OAuth token, cookie or signed URL. Each inactive credential is stored separately with operating-system protection. The live Codex credential remains in the format required by the installed version.
+| 字段 | 作用 | 规则 |
+| --- | --- | --- |
+| 档案编号与显示名 | 供用户选择 | 不得依赖接口地址充当唯一编号 |
+| 类型 | 官方 OAuth 或 API 兼容中转 | 创建后如需改类型，应新建档案 |
+| 接口地址 | 中转路线 | 官方档案必须为空 |
+| 凭据引用 | 指向本机受保护快照 | 不保存密钥明文 |
+| 首选模型 | 该供应商真实支持的模型 | 不得跨档案继承 |
+| 候选模型 | 用户确认后的备选项 | 不能静默自动替换 |
+| 代理策略 | 是否遵循系统代理等 | 只管理当前版本实测过的字段 |
+| 最后验证信息 | Codex 版本、时间和能力结果 | 版本变化后自动失效 |
 
-## Field ownership
+插件、MCP、Skills、钩子、权限、项目和未知新字段继续以实时配置为准。档案不能把这些内容复制走，否则以后切换会把新配置覆盖回旧版本。
 
-For the built-in OpenAI provider plus compatible endpoint overrides, the optional multi-relay switcher normally owns only:
+## 创建档案
 
-- `model_provider`;
-- top-level `openai_base_url` presence or value;
-- `model`;
-- a specifically verified proxy feature flag;
-- a specifically verified transport feature flag, if the user chooses to manage it.
+### 官方账号
 
-Plugins, MCP servers, skills, hooks, permissions, projects and unknown future settings remain owned by the current live Codex file. Every switch reads that file first and patches only the owned fields.
+1. 先确认当前没有未完成事务，并保护正在工作的档案。
+2. 移除中转接口覆盖，写入经过验证的官方路线字段。
+3. 完全重启 Codex，由用户亲自完成 OAuth。
+4. 再次关闭 Codex，捕获稳定的认证状态。
+5. 用新进程发起真实请求，确认账号、模型和路线。
+6. 只有验证成功后，档案才从“准备中”变为“可用”。
 
-If a relay requires a genuinely different wire protocol, custom headers, or a custom provider definition that cannot use the built-in endpoint override, do not pretend it is equivalent. Give it an explicit provider contract, retest history behavior and explain that shared `openai` history compatibility may not apply.
+不存在官方登录态时，脚本只能引导用户登录，不能伪造一个官方档案。OAuth 失败或用户取消时，恢复原档案，目标档案保留为“未完成”或删除。
 
-## Why relay-specific models belong to profiles
+### API 兼容中转
 
-Different relays expose different model names and capabilities. Each API profile therefore carries its own preferred model and optional user-approved fallbacks. During onboarding:
+1. 询问接口地址、显示名和模型；密钥必须在本机遮罩输入。
+2. 先检查地址拼接、HTTPS Responses、模型和认证，不把 WebSocket 支持当作必然条件。
+3. 把密钥放入受保护的本机凭据边界，只在日志中记录类型和指纹。
+4. 写入暂存配置并完全重启 Codex。
+5. 用目标模型完成一次真实请求。
+6. 验证失败就回到原档案，目标档案保持“未就绪”。
 
-1. collect the base URL and requested model without a secret;
-2. accept the API key through a masked local input, never through chat;
-3. stage route, credential and model together;
-4. restart Codex when required;
-5. run a minimal real request and capability probe;
-6. mark the profile ready only if the selected model succeeds.
+## 更新档案
 
-Do not silently substitute another model. If the saved model disappears, stop and show the profile name, requested model and redacted validation error so the user can choose a replacement.
+接口地址、密钥、模型和代理策略的更新都要走小型事务：
 
-## Suggested user commands
+1. 保留旧版本，生成待验证的新版本；
+2. 显示将改变的字段，不显示密钥；
+3. 完全停止写入者并启用新版本；
+4. 重启 Codex 做真实请求；
+5. 成功后提交，失败则恢复旧版本。
 
-A generated CLI or small desktop app may expose actions such as:
+中转站更换模型时，不能因为首选模型失效就偷偷改用另一个模型。脚本应列出已探测到的候选项，让用户选择；用户不选择就保持原可用档案。
 
-~~~text
-init
-status
-profile list
-profile add official
-profile add relay
-profile update <profile-id>
-profile remove <profile-id>
-switch official:<profile-id>
-switch relay:<profile-id>
-config check
-history scan
-history prepare
-recover
-~~~
+## 删除档案
 
-Names are illustrative. The important separation is functional:
+删除前必须回答三个问题：
 
-- profile management handles intended endpoint, account, model and proxy policy;
-- switching changes live route plus credential as one transaction;
-- `config check` is read-only;
-- history preparation is slow, explicit and separate;
-- recovery is not hidden inside an ordinary switch.
+- 它是不是当前正在使用的档案？
+- 是否还有未完成事务或历史门禁依赖它？
+- 用户是否同时要删除受保护凭据？
 
-## First profile of each type
+当前档案不能直接删除。先切换到另一份已验证档案，再删除清单项和对应凭据快照。删除凭据应单独确认，并记录不含秘密的审计结果。
 
-An implementation cannot create a valid official profile without a real OAuth login, and it cannot create a relay profile without a real endpoint, key and working model.
+## 正式切换
 
-When only API mode exists:
+对于当前版本已经证明兼容的结构：
 
-1. register the tested current relay profile;
-2. protect its inactive credential state;
-3. remove the endpoint override and let the user complete official OAuth;
-4. fully restart Codex and validate a real official request;
-5. register the official profile;
-6. return to the user's requested final profile through the normal switch transaction.
-
-When only official mode exists, use the symmetric flow. Ask for relay metadata, collect the key locally, then validate after the required restart. Persist a bootstrap checkpoint before closing Codex so the process can resume safely.
-
-## Switching transaction
-
-1. Acquire an exclusive lock and confirm Codex plus every competing config manager is closed.
-2. Read and parse the current live configuration.
-3. Validate the target profile, protected credential and history gate.
-4. Write a durable transaction journal containing hashes and rollback material.
-5. Save the current live credential back to its source profile if it has been validated.
-6. Create a staged config by changing only owned route/model/proxy fields.
-7. Stage the target credential.
-8. Parse both staged structures and verify route/auth consistency.
-9. Atomically activate config and credential according to the tested Windows ordering.
-10. Verify file identities and mark the transaction committed.
-11. Tell the user a full Codex restart is required; validate the effective route from the fresh process.
-
-If any step fails, restore only the journaled pre-switch state. Do not overwrite a newer live file whose identity no longer matches the journal.
-
-## Official versus relay behavior
-
-For a proven compatible build:
-
-| Profile type | `model_provider` | `openai_base_url` | Credential | Model |
+| 目标 | `model_provider` | `openai_base_url` | 当前认证 | 模型 |
 | --- | --- | --- | --- | --- |
-| Official account | `openai` | absent | that account's OAuth state | official supported model |
-| Relay A | `openai` | Relay A URL | Relay A API key | Relay A model |
-| Relay B | `openai` | Relay B URL | Relay B API key | Relay B model |
+| 官方账号 | `openai` | 删除 | 该账号 OAuth | 官方支持模型 |
+| 中转 A | `openai` | 中转 A 地址 | 中转 A 密钥 | 中转 A 模型 |
+| 中转 B | `openai` | 中转 B 地址 | 中转 B 密钥 | 中转 B 模型 |
 
-This stable provider identity helps new local sessions remain discoverable across profiles. It does not prove that every relay produces response items compatible with the official endpoint. Run the separate response-item history probe before resuming relay-created conversations through OAuth.
+切换事务必须同时处理路线、认证、模型和代理策略。只换配置或只换认证都会产生矛盾状态。具体事务与回滚见[总体设计](architecture.md)和[安全与回滚](safety-and-rollback.md)。
 
-## Removing CC Switch from the workflow
+## 状态与处置闭环
 
-Import only the information the user confirms: profile display name, endpoint, model and intended proxy behavior. Enter keys again through the new switcher's local secret boundary instead of reading or copying another tool's internal database through a model.
+| 检查结果 | 处置 | 最终状态 |
+| --- | --- | --- |
+| 目标档案完整且版本验证仍有效 | 执行正常切换 | 已切换，等待新进程验证 |
+| 目标凭据缺失或过期 | 不写实时状态，引导重新认证 | 原档案继续可用；目标未就绪 |
+| 接口或模型验证失败 | 回滚路线和凭据 | 原档案恢复；保留脱敏错误 |
+| 实时配置已被外部工具改变 | 停止切换，进入配置恢复 | 不产生“半切换”状态 |
+| 历史指纹变化且用户要续聊旧对话 | 停止普通切换，单独运行历史准备 | 通过门禁后再切换 |
+| 用户中途取消 | 根据事务日志恢复 | 原状态或明确的未完成检查点 |
+| Codex 升级 | 让旧能力验证失效并重跑探针 | 验证完成前禁止无提示切换 |
 
-After every required profile works in the custom switcher:
+## 建议入口
 
-1. fully close CC Switch;
-2. disable its startup/background behavior;
-3. run the custom switcher's read-only config check;
-4. perform one full official-to-relay-to-official validation cycle;
-5. keep CC Switch from writing the same live `config.toml` again.
-
-The user may keep CC Switch installed for unrelated tools, but it must not remain an alternative owner of Codex's live configuration.
+本机脚本或小应用可以提供“查看状态、添加档案、更新档案、删除档案、切换档案、只读检查、历史准备、恢复”这些独立入口。普通切换不应偷偷执行耗时历史扫描，恢复也不应藏在下一次切换里。
