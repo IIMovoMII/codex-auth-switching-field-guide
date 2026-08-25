@@ -18,7 +18,7 @@
 
 This repository is **not a universal switcher to install**. It is a product brief and field guide, written primarily for coding agents: inspect the current machine, understand its Codex build and local state, then build an appropriate script, app, or other implementation.
 
-> The repository describes outcomes, hard-won lessons, and acceptance criteria—not one mandatory codebase. Adapt the architecture, interface, and feature set to the user's environment. Windows paths and mechanisms are validated examples, not universal requirements.
+> This guide provides goals, hard-won lessons, and acceptance criteria rather than one mandatory codebase. Windows is the validated example; other systems can use native equivalents.
 
 The hard part is not changing one URL. A dependable design must preserve a live <code>config.toml</code>, isolate credentials, keep old conversations resumable, survive interrupted writes, recover offline after an external config rewrite, and explain exactly what happens on first use.
 
@@ -40,7 +40,7 @@ Copying entire configuration files appears simple, but it silently freezes unrel
 | Situation | What a machine-specific implementation should achieve |
 | --- | --- |
 | One PC alternates between official OAuth and an API-compatible relay | Switch route and credential as one transaction while keeping one evolving Codex configuration |
-| Several official accounts are used on the same Windows profile | Keep each OAuth snapshot protected and make account identity explicit before activation |
+| Several official accounts are used on the same machine | Keep each OAuth snapshot protected and make account identity explicit before activation |
 | Several API providers expose different model catalogs | Bind endpoint, credential, model and proxy policy to each profile without cloning the whole config |
 | Plugins, MCP servers, skills or hooks are edited frequently | Start every switch from the live configuration so unrelated changes survive |
 | Old local conversations contain provider names from earlier relay definitions | Inventory active and archived history, then normalize every proven local provider field to `openai` before cross-mode use |
@@ -49,7 +49,7 @@ Copying entire configuration files appears simple, but it silently freezes unrel
 | No official OpenAI login has ever existed on the machine | Preserve the known API state, stage the official route, let the user complete OAuth, restart Codex and verify the resulting official session before capturing it |
 | No relay/API profile or key has ever been configured | Ask for non-secret endpoint and model choices, provide a local secret-entry path, restart Codex and verify the real route before calling the profile ready |
 | Some settings are observable only after a Codex restart | Persist a bootstrap checkpoint, tell the user exactly what to do next, and continue post-restart verification instead of claiming success in one pass |
-| CC Switch or another tool also writes Codex's live config | Select one configuration owner, close the others, and ask the user to save one verified complete config before the first write |
+| CC Switch or another tool also writes Codex's live config | Select one configuration owner, close the others, and save one verified complete config before the first write |
 | `config.toml` is emptied, reduced to a generic template, or loses tables | Provide both known-good rollback and no-backup offline reconstruction without depending on a working Codex conversation |
 | The user wants several relays without CC Switch | Optionally implement relay profiles whose endpoint, protected credential, model and proxy policy patch the live config instead of replacing it |
 
@@ -65,11 +65,11 @@ Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide in ful
 
 This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
 
-## Align requirements before implementation
+## Choose the scope you need
 
-Do not ask the user for facts the agent can inspect, such as the operating system, Codex version, paths, or current configuration. Ask only for choices that cannot be inferred and materially change the product: account and relay count, whether old conversations are in scope, preferred interface, acceptable shutdown behavior, and which models or proxy policies belong to each profile.
+The smallest useful version is a two-mode official/relay switch. Add multiple accounts, multiple relays, history compatibility, a status page, or automated diagnostics only when needed. Describe the number of accounts and relays, whether old conversations are in scope, the preferred interface, and the model or proxy policy for each profile; the machine can provide its own OS, paths, Codex build, and current configuration.
 
-The user may want a two-mode button, or may add multiple accounts, relay profiles, history repair, a status page, or automated diagnostics. Omit unwanted modules. Credential isolation, preservation of unrelated live config, safe writes, and rollback remain invariants across implementations.
+Every version should still isolate credentials, preserve unrelated configuration, recover from failed writes, and pass a real post-restart test in each mode.
 
 ## Architecture
 
@@ -136,9 +136,9 @@ Treat CC Switch and a custom Codex switcher as incompatible owners of the same l
 
 The source-level conflict is still observable: CC Switch describes its database/profile state as authoritative and projects selected configuration text into the live Codex file. Current releases include backfill and common-config protections, but that does not prove preservation of every field added by a different owner. See the pinned [configuration model](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/docs/user-manual/zh/5-faq/5.1-config-files.md#L295-L322), [switch flow](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/services/provider/mod.rs#L4931-L4942) and [live write path](https://github.com/farion1231/cc-switch/blob/9a596158ca926e74b56243c08af67d9dd13fc27c/src-tauri/src/codex_config.rs#L864-L880).
 
-Before the custom switcher writes anything, ask the user to save one complete `config.toml` that has passed a real request from a fresh Codex process. This may be one bounded, user-managed recovery point; an ever-growing automatic archive is not required. Then close CC Switch and disable its Codex config writes.
+Before the custom switcher writes anything, privately save one complete `config.toml` that has passed a real request from a fresh Codex process. This may be one bounded, user-managed recovery point; an ever-growing automatic archive is not required. Then close CC Switch and disable its Codex config writes.
 
-If the live config is empty, malformed, or reduced to a generic/common template, stop every writer before another switch. Restore the full known-good structure, then reapply only route fields for the currently active auth. Without a backup, reconstruct a minimal parseable file from the installed version's official reference and add verified plugin, MCP, skill, hook, permission and project keys one subsystem at a time. When Codex cannot converse, use offline PowerShell or another coding agent such as Claude, without exposing credentials. The complete playbook is in [config recovery and external writers](references/config-recovery.en.md).
+If the live config is empty, malformed, or reduced to a generic/common template, stop every writer before another switch. Restore the full known-good structure, then reapply only route fields for the currently active auth. Without a backup, reconstruct a minimal parseable file from the installed version's official reference and add verified plugin, MCP, skill, hook, permission and project keys one subsystem at a time. When Codex cannot converse, use a local command line or another coding agent such as Claude, without exposing credentials. The complete playbook is in [config recovery and external writers](references/config-recovery.en.md).
 
 ## Optional multi-relay profiles without CC Switch
 
@@ -197,19 +197,6 @@ Provider normalization makes local conversation identity consistent. It does not
 - CC Switch and a custom switcher may both believe they own the live configuration; never alternate them on the same file.
 - Once a config has collapsed to a generic template, another switch can erase more evidence. Stop writers and recover offline first.
 - Multiple relays do not require multiple full configs. Keep relay-specific models and credentials in profiles while preserving the live file.
-
-## Using this with a coding agent
-
-Point the agent at [SKILL.en.md](SKILL.en.md) and ask it to design a switcher for the current machine. It should inspect readable environment facts first, then ask one focused set of questions about account count, relay targets, interface, history scope, and shutdown preferences. The agent should:
-
-1. perform read-only discovery;
-2. show the detected state without exposing secret values;
-3. propose a field-ownership and recovery model;
-4. obtain user confirmation before credential or history mutation;
-5. implement a local solution appropriate to the detected Codex build;
-6. run the full validation matrix.
-
-The guide deliberately avoids distributing a ready-made credential manager. Local paths, operating systems, Codex builds, relay behavior, account count and acceptable risk differ too much for blind installation to be responsible.
 
 ## Scope
 
