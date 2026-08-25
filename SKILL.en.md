@@ -1,11 +1,11 @@
 ---
 name: codex-auth-switching-field-guide
-description: Use when designing, auditing, or repairing a machine-specific Windows workflow that switches Codex between official OAuth accounts and API-compatible endpoints while preserving live configuration, credentials, plugins, MCP, skills, hooks, and local conversation compatibility.
+description: Use when designing, auditing, or repairing a machine-specific Codex workflow that switches official OAuth accounts and API-compatible endpoints while preserving live configuration, credentials, extensions, and local conversation compatibility.
 ---
 
 # Codex Auth Switching Field Guide
 
-Build a bespoke solution for the current machine. Do not install or copy a universal switcher.
+Build a bespoke solution for the current machine. Do not copy a universal switcher blindly.
 
 ## Applicable scenarios
 
@@ -13,30 +13,38 @@ Use this guide when the machine needs any combination of official OAuth accounts
 
 Do not treat it as a cloud-chat migration method, an account-policy bypass, or a portable credential-sharing mechanism.
 
+## Product-brief status and implementation freedom
+
+This repository is a product brief and experience pack for agents, not a ready-to-deploy application or a mandatory architecture. Understand the user's desired outcome, inspect the current machine, and choose an appropriate script, desktop app, native profile mechanism, or other design. Add, remove, or replace optional features to match the request.
+
+Windows paths, fields, and workflows are validated examples. Use native equivalents elsewhere and re-probe version-sensitive behavior. Do not ask the user for facts that can be inspected safely; ask only for choices that cannot be inferred and materially change the product.
+
 ## One-prompt kickoff
 
 When the user arrives through the README's one-prompt deployment sentence, treat it as authorization for read-only discovery and construction of a local solution. It is not blanket authorization to expose credentials, install third-party software, switch the live account, or mutate conversation history. Pause immediately before those sensitive actions when they become necessary.
 
 ## Workflow
 
-1. Start with read-only discovery. Identify the Codex version, active processes, configuration source, credential store, active route, model, history stores, proxy behavior, requested profile set, and external config managers such as CC Switch.
+1. Start with read-only discovery. Identify the operating system, Codex version, active processes, configuration source, credential store, active route, model, history stores, proxy behavior, and external config managers such as CC Switch.
 2. Report state without reading secret values into the conversation. Show credential type and consistency, not token contents.
-3. Establish one configuration writer. If CC Switch or another manager projects profiles into the same live file, explain the ownership conflict and require the user to choose one tool before any mutation.
-4. Before the first write, ask the user to save one complete `config.toml` that has passed a real request after a fresh Codex restart. Do not silently create an unbounded backup archive.
-5. Define the switcher's owned fields. Preserve every unrelated live setting, including plugins, MCP servers, skills, hooks, permissions and project configuration.
-6. Model route, credential and history compatibility as separate state domains.
-7. Design first use from the detected starting state. Handle "no official login yet" and "no API/relay configuration yet" explicitly; never manufacture either state.
-8. Collect endpoint and model choices separately from secrets. Provide a local masked or OS-supported secret-entry path and never ask the user to paste a key into chat.
-9. When requested, model multiple relays as profiles containing endpoint, protected credential reference, model and proxy policy—not full copied configs—so the user can stop using CC Switch for Codex.
-10. Prove one stable provider identity for new conversations. For the built-in OpenAI route plus top-level endpoint-override architecture, use `model_provider = "openai"` in both official and API-compatible profiles only after the installed build and endpoint pass the probe; never redefine the reserved built-in `openai` provider table.
-11. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
-12. Before the first cross-mode activation, inventory provider values across active and archived local JSONL and every relevant SQLite store. Exclude cloud ChatGPT Work/Chat records.
-13. Require a stopped-writer barrier before changing credentials or history. With explicit user approval, normalize every proven semantic local provider field to `openai`, using database-aware backups and a field-level rollback manifest. Do not assume the first JSONL line is the only copy.
-14. Journal the previous state before every multi-file transition. Use OS-protected storage for inactive credentials.
-15. Keep full history preparation separate from ordinary switching. Treat provider normalization and response-item compatibility as separate rules, then gate official-mode activation with a cheap fingerprint of the prepared history.
-16. Provide an offline config-recovery path for empty, malformed or generic-template files. If Codex cannot converse, allow a local script or another agent to reconstruct from the user's known-good config without exposing credentials.
-17. Validate effective behavior after the relevant restart: route, authentication type, model availability, proxy path, transport, new-session provider metadata, representative old-conversation resume in both modes, rollback and preservation of unrelated configuration.
-18. After any Codex upgrade, rerun discovery and the transport/history probes before trusting the `openai` normalization contract again.
+3. Ask one focused set of questions about the choices still unknown: target accounts and relays, whether old conversations are in scope, preferred interface, acceptable shutdown behavior, and profile-specific models or proxy policies. Do not repeat discoverable environment questions.
+4. Agree on the smallest useful scope. The modules below are composable; every machine does not need every feature.
+5. Establish one configuration writer. If CC Switch or another manager projects profiles into the same live file, explain the ownership conflict and require the user to choose one tool before any mutation.
+6. Before the first write, ask the user to save one complete `config.toml` that has passed a real request after a fresh Codex restart. Do not silently create an unbounded backup archive.
+7. Define the switcher's owned fields. Preserve every unrelated live setting, including plugins, MCP servers, skills, hooks, permissions and project configuration.
+8. Model route, credential and history compatibility as separate state domains.
+9. Design first use from the detected starting state. Handle "no official login yet" and "no API/relay configuration yet" explicitly; never manufacture either state.
+10. Collect endpoint and model choices separately from secrets. Provide a local masked or OS-supported secret-entry path and never ask the user to paste a key into chat.
+11. When requested, model multiple relays as profiles containing endpoint, protected credential reference, model and proxy policy—not full copied configs—so the user can stop using CC Switch for Codex.
+12. Prove one stable provider identity for new conversations. For the built-in OpenAI route plus top-level endpoint-override architecture, use `model_provider = "openai"` in both official and API-compatible profiles only after the installed build and endpoint pass the probe; never redefine the reserved built-in `openai` provider table.
+13. Treat first use as a persistent, idempotent bootstrap state machine. Save a checkpoint before every required Codex shutdown or restart, then verify the effective state from a fresh process before advancing.
+14. When the user requires old conversations across modes, inventory provider values across active and archived local JSONL and every relevant SQLite store. Exclude cloud ChatGPT Work/Chat records.
+15. Require a stopped-writer barrier before changing credentials or history. With explicit user approval, normalize every proven semantic local provider field to `openai`, using database-aware backups and a field-level rollback manifest. Do not assume the first JSONL line is the only copy.
+16. Keep full history preparation separate from ordinary switching. Treat provider normalization and response-item compatibility as separate rules, then gate official-mode activation with a cheap fingerprint of the prepared history.
+17. Use a transaction and rollback design appropriate to the platform for multi-file changes, and protect inactive credentials with native facilities.
+18. Provide an offline config-recovery path for empty, malformed or generic-template files. If Codex cannot converse, allow a local script or another agent to reconstruct from the user's known-good config without exposing credentials.
+19. After the relevant restart, validate the behavior selected by the user: route, authentication type, model, proxy and transport where applicable, new-session provider metadata, representative old-conversation resume when in scope, rollback, and preservation of unrelated configuration.
+20. After any Codex upgrade, rerun discovery and the transport/history probes before trusting the `openai` normalization contract again.
 
 ## Non-negotiable safety rules
 
@@ -68,16 +76,4 @@ When the user arrives through the README's one-prompt deployment sentence, treat
 
 ## Deliverable
 
-Produce a machine-specific design or implementation with:
-
-- a state inventory;
-- explicit field ownership;
-- a first-use flow;
-- one-writer ownership and offline config-recovery instructions;
-- optional multi-relay profile behavior when requested;
-- secure credential handling;
-- transaction and rollback behavior;
-- a separate history-preparation command;
-- a redacted before/after inventory proving historical and future local provider metadata use the verified stable identity;
-- a versioned validation report;
-- known limits and recovery instructions.
+Cover the user's selected scope and at minimum explain the redacted state inventory, field ownership, first-use flow, credential boundary, failure recovery, validation evidence, and known limitations. Multi-relay support, history preparation, or a graphical interface may be omitted when the user did not select them; if included, close the corresponding loop in the routed reference.

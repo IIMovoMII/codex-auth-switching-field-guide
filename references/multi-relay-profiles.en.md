@@ -104,7 +104,7 @@ When only official mode exists, use the symmetric flow. Ask for relay metadata, 
 6. Create a staged config by changing only owned route/model/proxy fields.
 7. Stage the target credential.
 8. Parse both staged structures and verify route/auth consistency.
-9. Atomically activate config and credential according to the tested Windows ordering.
+9. Atomically activate config and credential according to ordering tested on the current operating system and filesystem.
 10. Verify file identities and mark the transaction committed.
 11. Tell the user a full Codex restart is required; validate the effective route from the fresh process.
 

@@ -7,7 +7,7 @@ Treat a connection failure as a layered problem. Similar UI messages can come fr
 1. name resolution;
 2. TCP reachability;
 3. TLS certificate and hostname validation;
-4. Windows proxy selection;
+4. system and process proxy selection;
 5. HTTPS request routing;
 6. WebSocket upgrade routing;
 7. API path construction;
@@ -27,7 +27,7 @@ Test one layer at a time with the same environment the Codex process actually in
 | Model not found | profile/model mismatch | provider model catalog and selected ID |
 | Reconnect count on first turn, then success | WebSocket attempt followed by HTTPS fallback | upgrade support and timeout duration |
 | Every route reaches the relay in official mode | stale endpoint override | effective merged config |
-| Browser works but Codex fails | different proxy stack | Windows system proxy and process environment |
+| Browser works but Codex fails | different proxy stack | system proxy and process environment |
 
 ## HTTPS and WebSocket are separate capabilities
 
@@ -49,19 +49,19 @@ Clarify whether the configured base URL already contains the API version segment
 
 Log only the host and normalized path when safe. Strip query parameters, credentials and signed fragments.
 
-## Windows proxy behavior
+## System and process proxy behavior
 
 “VPN enabled” is not enough information. Determine:
 
 - TUN mode versus rule mode;
-- Windows system proxy state;
+- operating-system proxy state and whether Codex can inherit it;
 - environment proxy variables inherited by Codex;
 - bypass rules;
 - DNS behavior;
 - whether WebSocket upgrades follow the same route as HTTPS;
 - whether the current Codex build supports and honors a system-proxy feature flag.
 
-A feature such as <code>respect_system_proxy</code> may be development-stage or version-sensitive. Test it with a new Codex process after changing configuration. Never describe it as permanent or universally available.
+On Windows, also distinguish system proxy, TUN and rule mode; on macOS or Linux, inspect the machine's actual network stack. A feature such as <code>respect_system_proxy</code> may be development-stage or version-sensitive. Test it with a new Codex process after changing configuration. Never describe it as permanent or universally available.
 
 Official and API profiles may need different proxy policies. Make proxy policy an owned profile field only when the target environment actually requires it.
 

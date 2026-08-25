@@ -83,7 +83,7 @@ Deleted values cannot be recovered exactly from nothing. The goal becomes contro
 3. Recover non-secret key paths from trustworthy local evidence: project documentation, exported plugin/MCP lists, hook files, version-controlled project settings and user-confirmed recollection. Never scrape tokens into a prompt.
 4. Add one subsystem at a time and restart when the installed build only loads that setting at process start.
 5. Test a new disposable conversation before touching local history.
-6. When Codex itself cannot converse, run a local offline PowerShell repair tool or use another coding agent such as Claude to inspect and reconstruct the file. Give that agent file paths and redacted structure, not credential values.
+6. When Codex itself cannot converse, use the machine's local shell or another coding agent such as Claude to inspect and reconstruct the file. Give that agent file paths and redacted structure, not credential values.
 7. After the reconstructed file passes a real request and subsystem checks, ask the user to save it as the new known-good copy.
 
 An agent must say which values were reconstructed, which were user-supplied and which remain unknown. It must never invent deleted MCP commands, hook paths, provider URLs or models.

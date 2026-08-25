@@ -18,10 +18,8 @@ The switching process can copy opaque credential bytes without displaying or par
 
 ## Local protection
 
-On Windows:
+Use the current operating system's user-scoped secret store and permissions—for example DPAPI and ACLs on Windows, Keychain on macOS, or an available keyring plus restrictive file modes on Linux. In every implementation:
 
-- use a current-user protection mechanism such as DPAPI for inactive snapshots;
-- restrict the state directory ACL to the current user;
 - avoid inherited broad permissions;
 - protect transaction rollback material as carefully as credentials;
 - document that protected snapshots are not portable backups;

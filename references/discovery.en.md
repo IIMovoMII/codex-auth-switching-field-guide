@@ -6,7 +6,7 @@ The implementation should begin with a read-only inventory. The output is a reda
 
 Record:
 
-- Windows version and architecture;
+- operating system, desktop environment and architecture;
 - Codex Desktop and CLI versions;
 - whether Desktop and CLI use the same Codex home;
 - relevant process names and child processes;
@@ -30,7 +30,7 @@ Discover rather than hard-code:
 - any existing profile-switcher state.
 - whether the user has a complete, known-good `config.toml` that passed a real request after restart; report presence only, never its values.
 
-Use placeholders such as <code>%USERPROFILE%\.codex</code> in reports. Never publish a real username or absolute home path.
+Use platform-appropriate placeholders such as <code>%USERPROFILE%\.codex</code> or <code>$HOME/.codex</code> in reports. Never publish a real username or absolute home path.
 
 ## 3. Parse configuration structurally
 
@@ -91,7 +91,7 @@ For each intended route, determine:
 | Responses over HTTPS | Is the exact route implemented? |
 | Responses over WebSocket | Is the upgrade route implemented and reachable? |
 | Models | Which model identifiers are available? |
-| Proxy | Does the process honor the expected Windows proxy path? |
+| Proxy | Does the process honor the expected system or process proxy path? |
 | Error shape | Are structured errors preserved or rewritten? |
 
 Use a minimal, non-sensitive probe. Separate connectivity, authentication and model availability so one failure is not misdiagnosed as another.
@@ -109,6 +109,7 @@ Ask for intent only after machine facts are known:
 - whether old conversations must be resumed in every mode;
 - whether the user accepts a manual login step on first use;
 - whether the switcher may require Codex to be fully closed.
+- whether the user will stop CC Switch or any other competing owner of Codex configuration.
 
 The answer determines whether a simple two-state switch or a profile registry is appropriate.
 

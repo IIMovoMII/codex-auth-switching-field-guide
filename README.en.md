@@ -2,10 +2,10 @@
 
 # Codex Auth Switching Field Guide
 
-**Build a machine-specific, rollback-first workflow for switching Codex between official OAuth accounts and API-compatible endpoints on Windows.**
+**A field-tested product brief for agents building a machine-specific, rollback-first Codex auth and endpoint switcher.**
 
 [![Field Guide](https://img.shields.io/badge/type-field%20guide-6f42c1)](#what-this-is)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#scope)
+[![Adaptation](https://img.shields.io/badge/adaptation-machine--specific-0078D4)](#scope)
 [![Codex](https://img.shields.io/badge/focus-Codex%20Desktop%20%2B%20CLI-111827)](#scope)
 [![Validation](https://github.com/IIMovoMII/codex-auth-switching-field-guide/actions/workflows/validate.yml/badge.svg)](https://github.com/IIMovoMII/codex-auth-switching-field-guide/actions/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-MIT-16a34a)](LICENSE)
@@ -16,7 +16,9 @@
 
 ## What this is
 
-This repository is **not a universal switcher to install**. It is a field guide for an engineer or coding agent to inspect one Windows machine, understand its Codex version and local state, then build the smallest safe switcher that fits that environment.
+This repository is **not a universal switcher to install**. It is a product brief and field guide, written primarily for coding agents: inspect the current machine, understand its Codex build and local state, then build an appropriate script, app, or other implementation.
+
+> The repository describes outcomes, hard-won lessons, and acceptance criteria—not one mandatory codebase. Adapt the architecture, interface, and feature set to the user's environment. Windows paths and mechanisms are validated examples, not universal requirements.
 
 The hard part is not changing one URL. A dependable design must preserve a live <code>config.toml</code>, isolate credentials, keep old conversations resumable, survive interrupted writes, recover offline after an external config rewrite, and explain exactly what happens on first use.
 
@@ -58,10 +60,16 @@ This guide is not intended to sync cloud ChatGPT conversations, bypass account p
 Copy this sentence into a new Codex task:
 
 ~~~text
-Codex, read and follow `SKILL.en.md` in https://github.com/IIMovoMII/codex-auth-switching-field-guide, then open the relevant `references/*.en.md` files it routes to. For this Windows machine, design, implement and validate a rollback-safe Codex official OAuth/API-relay switcher. Start with read-only discovery and report the plan; obtain my confirmation before any sensitive write.
+Codex, read https://github.com/IIMovoMII/codex-auth-switching-field-guide in full, starting with `SKILL.en.md`, then build and validate a Codex auth/endpoint switcher for my machine and requirements.
 ~~~
 
 This is “deployment” by delegation, not a binary installer. The sentence authorizes read-only discovery and construction of a local solution; it does not authorize silent third-party installation, credential disclosure or unconfirmed history mutation.
+
+## Align requirements before implementation
+
+Do not ask the user for facts the agent can inspect, such as the operating system, Codex version, paths, or current configuration. Ask only for choices that cannot be inferred and materially change the product: account and relay count, whether old conversations are in scope, preferred interface, acceptable shutdown behavior, and which models or proxy policies belong to each profile.
+
+The user may want a two-mode button, or may add multiple accounts, relay profiles, history repair, a status page, or automated diagnostics. Omit unwanted modules. Credential isolation, preservation of unrelated live config, safe writes, and rollback remain invariants across implementations.
 
 ## Architecture
 
@@ -192,7 +200,7 @@ Provider normalization makes local conversation identity consistent. It does not
 
 ## Using this with a coding agent
 
-Point the agent at [SKILL.md](SKILL.en.md) and ask it to design a switcher for the current machine. The agent should:
+Point the agent at [SKILL.en.md](SKILL.en.md) and ask it to design a switcher for the current machine. It should inspect readable environment facts first, then ask one focused set of questions about account count, relay targets, interface, history scope, and shutdown preferences. The agent should:
 
 1. perform read-only discovery;
 2. show the detected state without exposing secret values;
@@ -201,11 +209,11 @@ Point the agent at [SKILL.md](SKILL.en.md) and ask it to design a switcher for t
 5. implement a local solution appropriate to the detected Codex build;
 6. run the full validation matrix.
 
-The guide deliberately avoids distributing a ready-made credential manager. Local paths, Codex builds, relay behavior, account count and acceptable risk differ too much for blind installation to be responsible.
+The guide deliberately avoids distributing a ready-made credential manager. Local paths, operating systems, Codex builds, relay behavior, account count and acceptable risk differ too much for blind installation to be responsible.
 
 ## Scope
 
-The patterns are aimed at Codex Desktop and Codex CLI on Windows. They may help on other platforms, but path handling, process barriers, credential storage and filesystem semantics must be redesigned.
+The design can be adapted to Codex Desktop and Codex CLI across operating systems. The field evidence here is primarily Windows-based; other platforms should replace process barriers, credential protection, paths, and filesystem operations with native equivalents and revalidate them. “Cross-platform” here means adaptable guidance, not one untested binary claimed to work everywhere.
 
 An observed setup successfully used `openai` for both future and historical local provider metadata while changing only the top-level endpoint and credential state. That is evidence for a pattern, not a promise that the same history fields or semantics remain valid in every Codex release. Re-run discovery after upgrades.
 
@@ -218,11 +226,11 @@ An observed setup successfully used `openai` for both future and historical loca
 - Keep a redacted audit trail of transitions.
 - Treat conversation files as private user data.
 
-See [SECURITY.md](SECURITY.en.md) before sharing logs or examples.
+See [SECURITY.en.md](SECURITY.en.md) before sharing logs or examples.
 
 ## Contributing
 
-Contributions should add reproducible observations, version context and a safe validation method. Avoid machine-specific code presented as universal behavior. See [CONTRIBUTING.md](CONTRIBUTING.en.md).
+Contributions should add reproducible observations, version context and a safe validation method. Avoid machine-specific code presented as universal behavior. See [CONTRIBUTING.en.md](CONTRIBUTING.en.md).
 
 ## License
 

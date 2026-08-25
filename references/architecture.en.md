@@ -27,7 +27,7 @@ Codex needs its live credential in the format and location supported by the curr
 
 Inactive profiles belong in an OS-protected local store. Each snapshot should include metadata such as profile ID, auth type, creation time and a hash of the encrypted blob. The metadata must not contain secret values.
 
-On Windows, DPAPI is one reasonable local primitive. It normally binds a protected blob to a Windows identity, and sometimes to the machine, so it is not a portable backup strategy.
+Prefer the current operating system's user-scoped secret protection. Examples include DPAPI on Windows, Keychain on macOS and an available desktop keyring on Linux. Verify the actual machine capability and portability; protected snapshots are not cross-device backups.
 
 ### Profile manifest
 
@@ -75,7 +75,7 @@ At switch time:
 4. preserve unknown tables, comments and unrelated additions when the chosen TOML library permits;
 5. serialize to a sibling temporary file;
 6. parse the temporary file again;
-7. replace the live file atomically where Windows semantics allow;
+7. replace the live file atomically using semantics verified for the current operating system and filesystem;
 8. verify the resulting effective configuration.
 
 If comment preservation matters and the parser cannot round-trip comments, use a syntax-aware editor or an explicitly tested narrow patcher. Do not fall back to global string replacement.

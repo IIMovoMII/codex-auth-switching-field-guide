@@ -8,7 +8,7 @@
 
 记录：
 
-- Windows 版本与架构；
+- 操作系统、桌面环境与架构；
 - Codex Desktop 和 CLI 版本；
 - Desktop 与 CLI 是否使用同一个 Codex 主目录；
 - 相关进程、子进程和实际可执行文件路径；
@@ -33,7 +33,7 @@
 - 已存在的档案切换器状态；
 - 用户是否有一份在重启后完成过真实请求的完整、已知良好配置，只报告“有／无”，不显示内容。
 
-报告中使用 `%USERPROFILE%\.codex` 等通用写法，不能公开真实用户名和用户目录。
+报告中使用 `%USERPROFILE%\.codex`、`$HOME/.codex` 等对应平台的通用写法，不能公开真实用户名和用户目录。
 
 当前 [Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference) 明确区分用户级与项目级配置：provider、认证、通知和档案选择等机器级字段不能由项目 `.codex/config.toml` 覆盖。发现这些字段时必须记录它们来自哪一层，不能只看项目文件。
 
@@ -96,7 +96,7 @@
 | HTTPS Responses | 精确路径是否实现？ |
 | Responses WebSocket | 升级路径是否实现且可达？ |
 | 模型 | 哪些模型编号真实可用？ |
-| 代理 | 新启动的 Codex 是否走预期 Windows 代理？ |
+| 代理 | 新启动的 Codex 是否走预期的系统或进程代理？ |
 | 错误 | 错误结构是否被中转站重写？ |
 
 使用最小、非敏感探针，并把连通性、认证与模型可用性分开，不能用一次 401 推断 provider 配置错误。
