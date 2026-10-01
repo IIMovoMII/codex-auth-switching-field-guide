@@ -1,131 +1,42 @@
 # Discovery
 
-The implementation should begin with a read-only inventory. The output is a redacted state report, not a dump of local files.
+[简体中文](discovery.md)
 
-## 1. Establish the runtime boundary
+Inspect read-only before implementing. Return redacted findings, not config, auth or transcript dumps.
 
-Record:
+## Facts to inspect
 
-- operating system, desktop environment and architecture;
-- Codex Desktop and CLI versions;
-- whether Desktop and CLI use the same Codex home;
-- relevant process names and child processes;
-- CC Switch or any other config/profile manager that can rewrite the same Codex home, including startup or background behavior;
-- whether the current app combines ChatGPT and Codex surfaces;
-- configuration reload behavior observed in this build.
+- OS, actual Desktop/CLI versions, executables and state locations; they may use different builds or CODEX_HOME directories.
+- Active writers, external managers and unfinished transactions. A closed window is not a stopped process; merged/renamed apps invalidate fixed-name assumptions.
+- Effective config and its sources: user, project, native profile, CLI and environment. Layer support is version-specific; a visible file value may not win.
+- Route, model, reasoning level, transport and proxy; locations of plugins, MCP, skills, hooks, permissions and projects.
+- Auth kind/storage: OAuth, API key, missing or unreadable, without credential values.
+- Active/archived JSONL, SQLite schema, WAL, paginated/segmented/inherited history and cloud boundaries.
+- Protected snapshots, last validation and available recovery material.
 
-Do not assume that closing a visible window ends every process. Prove which processes can still write configuration, credentials, JSONL or SQLite.
+Generalize paths in public reports. Determine whether model menus come from cache, service responses or profile settings. A menu entry does not prove endpoint support for the model/effort pair.
 
-## 2. Locate state
+## Endpoint probes
 
-Discover rather than hard-code:
+Test path composition, TLS, auth, HTTPS Responses, optional WebSocket, exact model and reasoning level separately. Use minimal non-sensitive requests; real requests may incur cost and must stay within the accepted scope. Retain only status categories and timing.
 
-- effective Codex home;
-- live <code>config.toml</code>;
-- active authentication store, such as <code>auth.json</code> or a supported keyring;
-- rollout or session JSONL roots, including archived locations;
-- SQLite databases and their journal mode;
-- plugin, MCP, skill and hook configuration;
-- project or workspace metadata;
-- any existing profile-switcher state.
-- whether the user has a complete, known-good `config.toml` that passed a real request after restart; report presence only, never its values.
+A 401 does not prove a bad provider ID; a 404 does not prove every WebSocket route is unsupported; browser access does not prove Codex inherits the same proxy. See [network diagnostics](network-diagnostics.en.md).
 
-Use platform-appropriate placeholders such as <code>%USERPROFILE%\.codex</code> or <code>$HOME/.codex</code> in reports. Never publish a real username or absolute home path.
+Prove the shared openai identity on both the official route and relay override, including new-task metadata. If the other login does not exist, mark it pending and guide setup rather than inventing a bidirectional pass.
 
-## 3. Parse configuration structurally
+## Ask only for real choices
 
-Use a TOML parser when possible. Inventory:
+Group unresolved decisions that affect implementation:
 
-- effective <code>model_provider</code>;
-- top-level endpoint override fields;
-- selected model and reasoning settings;
-- custom provider tables;
-- feature flags related to transport or proxy handling;
-- plugins, MCP servers, skills, hooks, permissions and project entries;
-- config layers or profiles that can override each other.
-- signs that a complete config was replaced by a smaller generic/common template, such as missing previously expected subsystem tables.
+- Two modes or several accounts/relays?
+- Must old tasks continue across every profile? What is acceptable when safe conversion is impossible?
+- Command-line, small window or an existing system entrypoint?
+- Should model/reasoning settings follow profiles or preserve the current selection?
+- When can Codex close? What recovery-space/retention tradeoff is acceptable?
+- Which tool owns routing, and should existing profiles be imported?
 
-The report should identify where an effective value came from. A visually present field may be shadowed by another layer.
+Do not repeat preferences already supplied, turn readable OS/path/version facts into a questionnaire, or request complete config/auth files in chat.
 
-Do not read the configuration as a block of text and replace matching lines. Duplicate tables, comments, ordering and later overrides make text substitution fragile.
+## Discovery handoff
 
-## 4. Classify authentication without exposing it
-
-Determine:
-
-- whether the active state is OAuth, API key, absent or malformed;
-- whether the credential store is readable by Codex;
-- whether its apparent auth type agrees with the active route;
-- whether an existing inactive snapshot is protected and current.
-
-Diagnostics should return facts such as <code>auth_type = oauth</code> or <code>auth_type = api_key</code>. They should never print a token, refresh token, account cookie or full credential document.
-
-If official login has never happened on this machine, report that the official profile is uninitialized. Do not create a fake placeholder and call it ready.
-
-## 5. Inventory conversation storage
-
-Count and classify, without copying content into logs:
-
-- active and archived JSONL files;
-- distinct session metadata provider values and per-value counts;
-- distinct thread-settings provider identifiers and per-value counts;
-- response-item identifier families by semantic type;
-- every relevant SQLite store, its thread-provider values and per-value counts;
-- WAL and shared-memory side files;
-- currently open or recently changing files.
-
-Reconcile the provider counts across semantic copies. A provider value present in one session metadata record but repeated in many thread-settings events is not several unrelated problems. Record which local thread IDs and storage layers would be in scope for normalization, but do not log titles or conversation text.
-
-Separately identify cloud-backed ChatGPT Work/Chat records. Do not infer that they are editable local rollouts merely because the combined desktop app displays them beside Codex tasks.
-
-Sample structure, hashes and timestamps rather than user messages. A useful report says “three reasoning items use an unexpected identifier family,” not what the user discussed.
-
-## 6. Test endpoint capabilities
-
-For each intended route, determine:
-
-| Capability | Questions |
-| --- | --- |
-| Authentication | Which credential type is accepted? |
-| Base URL | Does the configured base already include the API version segment? |
-| Responses over HTTPS | Is the exact route implemented? |
-| Responses over WebSocket | Is the upgrade route implemented and reachable? |
-| Models | Which model identifiers are available? |
-| Proxy | Does the process honor the expected system or process proxy path? |
-| Error shape | Are structured errors preserved or rewritten? |
-
-Use a minimal, non-sensitive probe. Separate connectivity, authentication and model availability so one failure is not misdiagnosed as another.
-
-For the shared-identity design, also prove that the installed build can create a new session with `model_provider = "openai"` in both modes: official routing with no endpoint override, and API-compatible routing with the top-level `openai_base_url` override. If either route requires a different provider identity, do not normalize history to `openai`.
-
-## 7. Define the requested profile set
-
-Ask for intent only after machine facts are known:
-
-- number of official accounts;
-- number of API or relay providers;
-- preferred model per profile;
-- whether profiles need different proxy behavior;
-- whether old conversations must be resumed in every mode;
-- whether the user accepts a manual login step on first use;
-- whether the switcher may require Codex to be fully closed.
-- whether the user will stop CC Switch or any other competing owner of Codex configuration.
-
-The answer determines whether a simple two-state switch or a profile registry is appropriate.
-
-## Discovery deliverable
-
-Produce a redacted table containing:
-
-- detected paths expressed generically;
-- effective route and auth type;
-- configuration consistency;
-- active writers;
-- history compatibility summary;
-- transport capability summary;
-- missing states that require intentional user setup;
-- version-sensitive assumptions that must be validated.
-
-Stop here if the state is inconsistent. Resolve the mismatch before designing writes.
-
-If another manager owns the live config, stop and ask the user to select one writer. If the file is already empty, malformed or incomplete, follow [config recovery and external writers](config-recovery.en.md) before profile design.
+Report current state, chosen scope, missing credentials, shutdown-required actions, history layout and pending checks. Diagnose conflicts before writing. Unknowns need a next probe, not automatic classification as corruption.

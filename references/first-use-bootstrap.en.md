@@ -1,146 +1,52 @@
 # First use and restart checkpoints
 
-First use is not a one-pass inspection. Some configuration, authentication, proxy and plugin state becomes trustworthy only after a fresh Codex process loads it, and OAuth requires an interactive user step. A safe implementation must survive several Codex shutdowns and continue from durable checkpoints.
+[简体中文](first-use-bootstrap.md)
 
-## Hard invariant
+First use can span interactive login and multiple process restarts. Saved configuration is not a usable profile, and every machine need not follow a fixed number of restarts.
 
-A profile is not ready because its files look correct before restart. It becomes ready only after a fresh Codex process has loaded the staged state and a target-specific probe has succeeded.
+## Continue from the actual starting point
 
-The current Codex task may be interrupted when Desktop must close. Before asking for a restart, persist a non-secret checkpoint and show the exact action that resumes the bootstrap.
+| Starting state | Next action | If unsuccessful |
+| --- | --- | --- |
+| Official login only | Protect it, then guide API setup | Retain official state |
+| API state only | Protect it, then guide official OAuth | Keep API recoverable |
+| Both tested | Use routine switching | Transaction recovery |
+| Neither exists | Ask which to establish first, then native login/local entry | Remain uninitialized |
+| Snapshot exists but is unverified | Resume its checkpoint | Do not claim readiness |
+| Unclear origin or route/auth conflict | Diagnose before overwriting snapshots | Expose the specific conflict |
 
-If a Desktop notifier is installed, write an expiring maintenance marker before each planned close and clear it after validation or rollback. The marker may suppress only the planned-exit warning, never an explicit error.
+A direct OpenAI API key may be a valid third mode. If the selected product only covers official OAuth and relay, classify it as unsupported rather than corrupted. Distinguish locally readable auth kind from a successful real request.
 
-## Classify the starting state
+## No official login
 
-| Detected state | Required response |
-| --- | --- |
-| Valid official state, no API profile | Protect the official state, then initialize API in stages |
-| Valid API state, no official profile | Protect the API state, then initialize official OAuth in stages |
-| Both states already validated | Use the normal switch transaction |
-| Neither credential exists | Stop and ask which mode the user wants to establish first |
-| Route, auth and model disagree | Do not capture the state; resolve the mismatch first |
-| Snapshot exists but its post-restart validation is missing | Resume the recorded bootstrap phase rather than starting over |
+Protect the working state, stage the official route and remove relay endpoints and other effective overrides. Then let the user complete the official login flow supported by this build. Never send official OAuth credentials to a relay URL.
 
-Before a first transition between official and API-compatible modes, add a read-only history-provider checkpoint. Inventory all active and archived local provider values. If the installed Codex build has proved the shared `openai` identity contract and the inventory is mixed, require a separate approved history-preparation operation while every Codex writer is stopped. The credential bootstrap resumes only after that operation has its own verified manifest and fingerprint.
+Credentials must come from actual login; empty auth.json or sample tokens do not create a profile. Mark it usable only after the expected account/route and a minimal real request work in a new process. Capture snapshots only with stopped writers and stable refreshed auth.
 
-## Durable bootstrap record
+On cancellation or login failure, retain the original profile and recovery path. Leave the target incomplete instead of overwriting a previously valid snapshot.
 
-Store only metadata such as:
+## No API/relay setup
 
-~~~text
-bootstrap_id
-schema_version
-starting_mode
-target_profile_id
-phase
-pre_change_fingerprints
-expected_post_restart_state
-next_user_action
-transaction_id
-last_verified_codex_version
-~~~
+Ask only unresolved non-secret preferences: provider, endpoint, model and reasoning level. Probe transport capabilities where possible rather than expecting the user to understand protocol terminology.
 
-Never store a token, OAuth document, conversation body or secret endpoint parameter in this record. Credential bytes belong in the protected snapshot store.
+Collect the key through masked local input or a system credential UI, never chat. Verify the endpoint, supported configuration shape and target model, then activate route and auth transactionally. Failed new-process requests cannot produce verified-ready state. Keep rollback available and ask before changing an unavailable model or reasoning level.
 
-Useful phases are:
+## First history preparation
+
+For cross-mode old-thread continuity, prove shared provider routing, then stop writers and prepare history. One first-switch entrypoint may chain these stages; separate manual commands are unnecessary. Unknown paginated layouts or unrecoverable model input require the disclosure or stop described in [history compatibility](history-compatibility.en.md), before activating target auth.
+
+## Resumable progress
+
+Persist non-secret checkpoints: workflow version, source/target profile IDs, stage, pre-change fingerprint, transaction reference, post-restart expectation, next user action and verified client version. Keep credentials and messages out of progress summaries.
+
+Possible stages:
 
 ~~~text
-baseline_verified
-target_staged
-restart_required
-interactive_login_required
-post_restart_probe_required
-target_verified
-rollback_required
-complete
+Source protected → target needs login/input → staged → pending restart verification
+                                                   → verified usable
+                                                   → resume/rollback required
 ~~~
 
-Every phase transition must be idempotent. Repeating the resume command after a crash should verify current state and continue safely, not duplicate credentials or overwrite a newer configuration.
+On re-entry, inspect actual state first; repeated clicks must not repeat overwrites. Explain how to continue before asking the user to close Codex. If a notification monitor is installed, use its supported bounded maintenance mechanism; never suppress errors indefinitely.
 
-## When no official OpenAI login exists
-
-1. Verify and protect the current known-good API state, if one exists.
-2. Confirm Codex Desktop, CLI and helper writers are stopped.
-3. Stage the official route by removing API endpoint overrides and applying only the owned official-mode fields.
-4. Confirm the live route still uses the verified `model_provider = "openai"` identity. If old local provider metadata is mixed, finish the separately approved normalization and its rollback validation now.
-5. Write <code>interactive_login_required</code> before starting Codex.
-6. Tell the user to reopen Codex and complete the official OAuth flow in the official route.
-7. After login, require another complete Codex shutdown so the bootstrap process can inspect a stable credential store.
-8. Resume from the checkpoint and verify:
-   - the active auth type is OAuth;
-   - no API endpoint override remains;
-   - a fresh official request succeeds;
-   - the intended model is available;
-   - a representative local task can be opened.
-9. Only then protect the official snapshot and mark the profile ready.
-10. Return to the user's requested final profile through the normal switch transaction.
-
-If the OAuth flow fails or the route still points at an API provider, keep the previous known-good profile and leave a resumable failure state. Do not save the failed login as an official profile.
-
-## When no API or relay configuration exists
-
-1. Ask for non-secret intent:
-   - provider display name;
-   - base URL convention;
-   - supported Responses transport;
-   - desired model;
-   - proxy policy.
-2. Give the user a local masked input or provider-supported credential-entry action. Do not ask for the API key in chat and do not echo it to logs.
-3. Validate the endpoint format without credentials where possible.
-4. Stop all Codex writers.
-5. Stage only the owned route, model and proxy fields, activate the locally entered credential, and save <code>restart_required</code>.
-6. Reopen Codex from a fresh process.
-7. Run separate post-restart probes for:
-   - effective base URL;
-   - active auth type;
-   - selected model;
-   - HTTPS Responses;
-   - WebSocket upgrade when relevant;
-   - system-proxy behavior;
-   - preservation of plugins, MCP servers, skills and hooks.
-8. Stop Codex again before capturing the stable credential snapshot.
-9. Mark the API profile ready only after every required probe passes.
-
-If the provider needs a model the user has not selected, present the discovered model choices and wait. Do not guess a model ID and call the profile complete.
-
-## Why several restarts may be necessary
-
-Different values become trustworthy at different times:
-
-| Stage | What can be verified |
-| --- | --- |
-| Before restart | TOML parses, intended fields and rollback material are correct |
-| First fresh process | Codex actually loads route, model, feature flags and credential type |
-| After interactive OAuth | The official login exists, but the credential store may still be changing |
-| After stopping again | The new auth state is stable enough to snapshot |
-| Second fresh process | The protected snapshot can be restored and used successfully |
-
-An implementation should display progress such as “stage 2 of 5 — restart required,” not claim that all checks were completed in one uninterrupted task.
-
-## Resume experience
-
-Before every restart, show:
-
-- what has already been verified;
-- why the restart is required;
-- what the user must do while Codex is open;
-- the exact resume command or button;
-- what will be checked afterward;
-- how to restore the starting profile if the next stage fails.
-
-On resume, compare the live state with <code>expected_post_restart_state</code>. If it differs, explain the mismatch and offer rollback; never skip ahead.
-
-## Validation cases
-
-Test at least:
-
-- no official state, successful OAuth across restarts;
-- OAuth cancelled midway;
-- no API state, locally entered valid key;
-- invalid endpoint, invalid key and unavailable model;
-- Codex reopened but not fully stopped before snapshot;
-- machine reboot between stages;
-- resume command run twice;
-- live config edited between stages;
-- rollback after each phase;
-- final switch to both newly initialized profiles.
+Startup-loaded settings require a new process. You may deliver the tool with pending acceptance steps, but cannot mark unperformed restart tests complete. Cancellation cleans only temporary profiles owned by this operation, not existing credentials or newer user data.

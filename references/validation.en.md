@@ -1,161 +1,60 @@
-# Validation
+# Validation and evidence limits
 
-A switcher is trustworthy only when behavior, preservation and recovery are tested together.
+[简体中文](validation.md)
 
-## Static invariants
+Validate the selected capabilities; do not present a suggested checklist as already tested. This repository ships no switcher. The evidence below is separate from acceptance criteria for a future implementation.
 
-Verify after every build:
+## Evidence behind this revision
 
-- all profile identifiers are unique;
-- no secret value is stored in source or logs;
-- all owned fields are declared in one schema;
-- configuration output parses;
-- credential snapshots are protected;
-- file permissions are restricted;
-- transaction schemas are versioned;
-- history manifests contain no conversation text.
+Environment: Windows, native Codex CLI 0.159.2; local scripts supporting PowerShell 7 and Windows PowerShell 5.1. Recorded on 2026-10-01, not a pass for future versions or other operating systems.
 
-## Configuration preservation tests
+| Check | Observed evidence | Limit |
+| --- | --- | --- |
+| Content after a real switch | Manifest/backups checked: 80 ID renames, zero removals; untouched lines byte-identical, changed lines differ only in the designated ID; database integrity passed | Proves this recorded mutation, not all history on every endpoint |
+| Pagination and continuation | Native client read old UI history from isolated copies and indexed appended synthetic events, including inherited history | No credentials or model requests; not official continuation acceptance |
+| Rejection and rollback | Synthetic cases cover wrong segment, cursor, event source, inheritance boundary, tool pairing and reversal of applied changes | No claim that every power/hardware failure was injected |
+| Bidirectional switching | Temporary homes and fake login exercise one-action initialization, required preparation and official/API transactions; configuration-preservation checks passed | Fake login cannot validate token lifetime or provider permissions |
+| Chinese and shell compatibility | Both PowerShell generations passed Chinese output, proxy switching, history and decoder tests | Not a tested three-platform app |
+| Performance | The same read-only projection-evidence check fell from 133.53 to 11.85 seconds while retaining the same rejection result; a separate full scan took about 8.46 seconds | Component benchmark, not total switching time or proof that this thread passed the repair gate |
+| Fast readiness | Unrelated logs do not invalidate preparation; history tables under unfamiliar filenames still count; rule-hash changes invalidate stale readiness | Metadata fingerprinting is not tamper-proof content validation |
 
-Create a fixture with representative unrelated settings:
+A recorded real transaction took about 29 seconds for backup, mutation and recheck, excluding scanning/planning. That does not contradict several minutes observed by the user. Retest the same component and never create speed by turning a rejection into acceptance.
 
-- plugin entries;
-- MCP servers;
-- skills;
-- hooks;
-- permissions;
-- projects;
-- comments and unknown future keys.
+Private local tests/data are not distributed here. The reusable material is the reasoning, boundaries and test design below, not a certificate for someone else's deployment.
 
-Switch through every profile and assert that only owned fields change. Add a new plugin while one profile is active, switch away and back, and confirm it survives.
+## Minimum implementation acceptance
 
-Also inject external-writer damage:
-
-- an empty `config.toml`;
-- malformed TOML;
-- a much smaller generic/common-provider template;
-- missing plugin, MCP, skill, hook, permission and project keys;
-- a stale `model_provider` name with no matching definition;
-- a competing config manager running during preflight.
-
-Ordinary switching must stop before changing route or credentials. Exercise both recovery routes: restore a user-managed known-good config, and reconstruct a minimal config when no backup exists. The no-backup report must distinguish recovered evidence, user-supplied values and unknown values.
-
-## First-use matrix
-
-Test:
-
-| Starting state | Expected behavior |
+| Scenario | Required evidence |
 | --- | --- |
-| Valid official state only | Register it, require intentional API setup |
-| Valid API state only | Register it, require intentional official login |
-| Both protected profiles ready | Switch normally |
-| No credential | Stop before writing |
-| Route/auth mismatch | Explain conflict; do not capture it |
-| Expired OAuth | Require official reauthentication |
-| Invalid API key | Keep prior working profile active |
+| Config preservation | Synthetic plugins, MCP, skills, hooks, permissions, projects, comments and unknown keys survive; only owned fields change, including settings added between switches |
+| Model/reasoning level | Exact pair supported without silent downgrade; unowned settings remain unchanged |
+| Missing credentials | Official-only, API-only, neither and incomplete setup have a next step; cancellation preserves the valid source |
+| Auth failure | Local-kind checks, real requests and token refresh tested separately; failures never marked ready |
+| Damaged config | Empty/invalid/template-only config, missing fields and concurrent edits recognized; known-good and no-backup recovery exercised |
+| One-action flow | Uninitialized, valid readiness, stale readiness and failed preparation converge; history failure precedes auth activation |
+| Logs/capacity | Redacted errors, stage timing and bounded retention; stop before sacrificing the only recovery material |
 
-For every row that creates a previously missing mode, test the required restart checkpoints. A pre-restart file inspection must never satisfy the post-restart acceptance gate.
+## History fixtures
 
-## Profile matrix
+Cover the supported layouts' relevant boundaries:
 
-For each official account and API provider:
+- active/archive roots, both provider fields, multiple WAL databases and excluded cloud rows;
+- shorter, longer and equal-width providers; insufficient paginated space rejected;
+- valid, generic and overlong IDs, target protocol length boundaries, collisions and unknown types;
+- protected reasoning, independent visible events and tool call/result pairing;
+- direct model projections versus event projections, logical IDs versus storage segment IDs;
+- nonzero inherited baselines, missing segments, invalid ordinals/byte cursors and incomplete indexing;
+- appended events after repair, reopening, repeated rollback and newer activity;
+- changed rules, related database changes, unrelated log changes and damaged readiness records.
 
-- effective route is correct;
-- credential type matches the route;
-- selected model is available;
-- proxy policy is applied as intended;
-- HTTPS Responses works;
-- WebSocket capability is measured separately;
-- a new conversation works;
-- a representative existing conversation resumes;
-- a second switch returns to the previous profile cleanly.
+Accept old-content visibility, model continuation and new-message indexing separately. Native offline copy tests cover visibility/indexing only; real model requests need their own result, not “scanner found zero.”
 
-For a multi-relay implementation, use at least two fixture relays with different model names and proxy policies. Confirm that switching changes only declared route/model/proxy fields, activates the matching credential, never copies one relay's model into another profile, and stops rather than silently substituting an unavailable model.
+## Failure and upgrades
 
-## History tests
+Inject risks relevant to the implementation: concurrent switching, locked files, denied writes, full disk, unreadable snapshots, interrupted writes, rollback failure and intervening user config edits. Outcomes should be restored source, verified target, pending restart/login, or a clearly recoverable unknown state, never vague partial success.
 
-Use synthetic fixtures, not private conversations, to cover:
+After Codex updates, recheck config, auth, history layout and transport. Preserve data and disable unverified history mutation until adapted; do not manually increase readiness version numbers. Upgrade detection can be cheap; expensive probes should run for a reason, not on every invocation.
 
-- mixed provider names across first-line session metadata, repeated thread-settings events and multiple SQLite stores;
-- provider names both equal and unequal in byte length to `openai`;
-- active and archived local sessions while cloud ChatGPT Work/Chat records remain untouched;
-- valid response item identifiers;
-- generic identifiers on different semantic item types;
-- recoverable and unrecoverable reasoning records;
-- tool calls and results;
-- repeated provider metadata;
-- archived sessions;
-- malformed JSONL;
-- SQLite WAL mode;
-- history changing after preparation;
-- rollback after partial repair.
+## Repository-check limits
 
-Acceptance requires structural parsing, relationship checks, SQLite integrity and a target-version resume test.
-
-For the shared-provider contract, additionally verify:
-
-- the live user configuration sets `model_provider = "openai"` in every official and API-compatible profile;
-- official mode omits the endpoint override and API-compatible mode supplies the intended top-level `openai_base_url`;
-- the historical normalization manifest reconciles every changed JSONL field and SQLite row;
-- no unexpected provider value remains in the intended local scope;
-- new sessions created after preparation record `openai` in both modes;
-- representative normalized old sessions resume through both modes after full restarts;
-- response-item compatibility is tested independently, so a provider-only pass cannot hide an `item_`/typed-ID failure.
-
-## Network tests
-
-Separate:
-
-- DNS/TLS;
-- HTTPS route;
-- WebSocket upgrade;
-- proxy inheritance;
-- authentication;
-- model availability.
-
-Run them with the same environment inherited by a newly started Codex process. Record sanitized results and the Codex version.
-
-## Failure and recovery tests
-
-Inject interruption after every transaction stage. Also test:
-
-- two switch attempts at once;
-- stale lock recovery;
-- read-only or locked files;
-- full disk;
-- protected snapshot unavailable;
-- state changed between preflight and commit;
-- machine or Codex restarted between every bootstrap phase;
-- bootstrap resume command run twice;
-- rollback state changed by the user;
-- Codex process restarts during the barrier.
-- CC Switch or another config manager rewrites the live file between preflight and commit;
-- the user replaces the known-good config deliberately, proving that retention stays bounded rather than accumulating silently.
-
-## Upgrade test
-
-After a Codex update:
-
-1. rerun discovery;
-2. compare configuration schema and effective fields;
-3. recheck auth storage;
-4. inspect new session records;
-5. repeat HTTPS and WebSocket probes;
-6. run history fixtures;
-7. switch only after the version gate passes.
-
-## Release evidence
-
-A release or local deployment report should include:
-
-- operating system and Codex version;
-- tested profile types;
-- configuration preservation result;
-- history fixture result;
-- network capability matrix;
-- failure-injection result;
-- privacy scan result;
-- known limitations;
-- recovery instructions.
-
-Do not include tokens, account identifiers, private hosts or conversation text.
+Run python scripts/validate_pack.py for required files, relative links, bilingual reference coverage and limited secret patterns. Skill quick validation checks entrypoint format only. Neither executes OAuth, a state machine, SQLite transactions, model requests or Windows fault injection, nor proves translation equivalence. Publication still needs human review of logic, evidence and privacy.

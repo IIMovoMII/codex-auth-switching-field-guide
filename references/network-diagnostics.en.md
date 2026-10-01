@@ -1,84 +1,35 @@
 # Network diagnostics
 
-Treat a connection failure as a layered problem. Similar UI messages can come from different layers.
+[简体中文](network-diagnostics.md)
 
-## Diagnostic layers
+“Reconnecting 5/5” is not one unique failure. Inspect redacted errors, paths and stages before classifying network, auth, model or history problems. A shared UI message does not establish a shared cause.
 
-1. name resolution;
-2. TCP reachability;
-3. TLS certificate and hostname validation;
-4. system and process proxy selection;
-5. HTTPS request routing;
-6. WebSocket upgrade routing;
-7. API path construction;
-8. authentication;
-9. model availability;
-10. application-level response compatibility.
+| Symptom | First checks |
+| --- | --- |
+| Timeout or broken stream | DNS/TLS, proxy, connection reuse and service state |
+| 404 | Effective base URL composition and exact route; one response does not establish all capabilities |
+| 401/403 | Auth kind, expiry, permission and destination |
+| Model/effort unavailable | Exact model/effort pair, provider capability and UI cache |
+| Each new/old task has a slow first turn, then works | Transport initialization, WebSocket retries and HTTPS fallback |
+| Official mode still calls the relay | Effective config, profiles, environment or launch-argument overrides |
+| 400 points to an old input ID/reasoning item | History protocol compatibility, not only proxy changes |
 
-Test one layer at a time with the same environment the Codex process actually inherits.
+## Test HTTPS and WebSocket separately
 
-## Common symptoms
+Responses HTTPS support does not prove WebSocket upgrade support. Inspect exact routes, authentication, required headers, proxy forwarding and client fallback.
 
-| Symptom | Likely layer | First checks |
-| --- | --- | --- |
-| Request timeout | proxy, firewall, route or WebSocket handshake | process proxy inheritance, direct HTTPS, upgrade request |
-| 404 on a Responses path | base-path duplication or relay feature gap | effective base URL and exact route |
-| 401 or 403 | credential type, scope or wrong route | active auth type without printing the token |
-| Model not found | profile/model mismatch | provider model catalog and selected ID |
-| Reconnect count on first turn, then success | WebSocket attempt followed by HTTPS fallback | upgrade support and timeout duration |
-| Every route reaches the relay in official mode | stale endpoint override | effective merged config |
-| Browser works but Codex fails | different proxy stack | system proxy and process environment |
+“5/5” alone does not establish exactly five WebSocket calls; confirm with this build's logs. WebSocket support is not universally mandatory: a client with HTTPS fallback may still use the relay, with first-turn delay.
 
-## HTTPS and WebSocket are separate capabilities
+Manage transport-disable or selection fields only when supported and tested on the installed version. Do not add an internet snippet the build ignores and declare success. If no effective switch exists, disclose the limit instead of disguising network failure through history edits.
 
-A provider can implement the Responses HTTPS endpoint without implementing the Responses WebSocket upgrade. A successful HTTPS probe therefore does not prove WebSocket support.
+## Proxy behavior is more than one flag
 
-Probe:
+“Global VPN” does not prove the client's actual route. Distinguish system proxy, process environment, TUN, bypass rules, DNS and WebSocket routing. Browser access is not a substitute for a client probe.
 
-- the exact HTTPS request path;
-- the exact WebSocket scheme and path;
-- whether required headers survive the proxy;
-- whether the server returns an upgrade response;
-- whether the client times out before falling back.
+Verify version-sensitive fields such as respect_system_proxy with a new process. On implementations supporting it, false means not actively following the system proxy; it does not bypass OS TUN or guarantee direct routing. Profiles may differ, but official-on/relay-off is not a policy for every machine.
 
-Do not work around a missing relay capability by mislabeling the provider or mutating conversation history.
+## Minimal probes and closure
 
-## Base URL composition
+Start with unauthenticated DNS/TLS and URL checks, then authorized minimal auth/model and relevant transport probes in Codex's actual launch environment. Never send official OAuth to an unofficial endpoint or log auth headers, request bodies or secret query parameters.
 
-Clarify whether the configured base URL already contains the API version segment. A client may append a Responses route, while a relay expects a different base convention. A duplicated or omitted segment often produces a clean 404 that looks like a server outage.
-
-Log only the host and normalized path when safe. Strip query parameters, credentials and signed fragments.
-
-## System and process proxy behavior
-
-“VPN enabled” is not enough information. Determine:
-
-- TUN mode versus rule mode;
-- operating-system proxy state and whether Codex can inherit it;
-- environment proxy variables inherited by Codex;
-- bypass rules;
-- DNS behavior;
-- whether WebSocket upgrades follow the same route as HTTPS;
-- whether the current Codex build supports and honors a system-proxy feature flag.
-
-On Windows, also distinguish system proxy, TUN and rule mode; on macOS or Linux, inspect the machine's actual network stack. A feature such as <code>respect_system_proxy</code> may be development-stage or version-sensitive. Test it with a new Codex process after changing configuration. Never describe it as permanent or universally available.
-
-Official and API profiles may need different proxy policies. Make proxy policy an owned profile field only when the target environment actually requires it.
-
-## A minimal probe sequence
-
-1. Resolve the hostname.
-2. Establish TLS without sending credentials.
-3. Send a minimal authenticated HTTPS request.
-4. Attempt the Responses WebSocket upgrade separately.
-5. Request or validate the selected model.
-6. repeat from the same process environment used to launch Codex.
-7. compare official and API profiles.
-
-Record timestamps, status class and sanitized route. Do not record request bodies or authorization headers.
-
-## Interpreting reconnect behavior
-
-If the first turn in each task waits through repeated WebSocket reconnects and later turns are faster, investigate per-task transport initialization and fallback caching. If both official and API modes show timeouts, the shared proxy path is more suspicious than the provider metadata. If only the relay returns 404, inspect relay route support and base URL composition.
-
-The switcher should manage verified profile fields. It should not hide a transport failure by suppressing all diagnostics.
+Restart and retest route corrections; handle auth through re-login; ask before changing unsupported models; disclose unavoidable fallback cost. Retry supplier errors such as 503 within bounds, not by editing history or endlessly switching accounts. When uncertain, retain the last usable profile and report the proven layers and next probe.

@@ -1,166 +1,65 @@
 # Architecture
 
-The safest design treats switching as a transaction across several independent state domains.
+[简体中文](architecture.md)
 
-## State domains
+## Four state domains, not two config files
 
-### Live configuration
+| State | Responsibility | What it does not establish |
+| --- | --- | --- |
+| Live configuration | Routing, models and evolving extension settings | Correct config does not prove valid credentials |
+| Credential profiles | Official or API identity, with OS-protected inactive snapshots | Existence does not prove successful or unexpired login |
+| History readiness | Checked scope, target rules and recovery manifest | Matching provider IDs do not prove valid model input |
+| Runtime verification | Effective route, requests and history in a new process | Local parsing does not prove network success |
 
-This remains the source of truth for everything that evolves during normal Codex use. The switcher reads it at switch time and changes only owned fields.
+A profile stores intent: identity, label, auth kind, endpoint, credential reference and selected model/reasoning/proxy policies. Plugins, MCP, skills, hooks, permissions and projects still come from the live file at switch time.
 
-Exactly one tool may own routing changes to this file. If CC Switch or another profile manager also projects saved profiles into the live file, the user must choose one owner and stop the other before implementation continues. See [config recovery and external writers](config-recovery.en.md).
+Native profiles, project configuration, CLI flags and environment variables can affect effective values. Inspect more than the user-level file. Coordinate one routing writer; see [config recovery](config-recovery.en.md) for competing managers such as CC Switch.
 
-Typical owned fields may include:
+## Shared provider identity
 
-- provider identity;
-- endpoint override;
-- model selection;
-- one transport or proxy feature flag.
-
-The exact list must come from discovery. A field should not be owned merely because it appeared in one working example.
-
-### Active credential
-
-Codex needs its live credential in the format and location supported by the current build. Do not encrypt or reshape the active document if Codex cannot read that form.
-
-### Inactive credential snapshots
-
-Inactive profiles belong in an OS-protected local store. Each snapshot should include metadata such as profile ID, auth type, creation time and a hash of the encrypted blob. The metadata must not contain secret values.
-
-Prefer the current operating system's user-scoped secret protection. Examples include DPAPI on Windows, Keychain on macOS and an available desktop keyring on Linux. Verify the actual machine capability and portability; protected snapshots are not cross-device backups.
-
-### Profile manifest
-
-A profile is intent, not a full copied config:
-
-~~~text
-profile_id
-display_name
-route_kind
-endpoint_reference
-credential_snapshot_reference
-preferred_model
-proxy_policy
-last_validated_codex_version
-~~~
-
-Several API-compatible relays may each have a profile with its own endpoint, credential reference, model and proxy policy. This removes the need to keep CC Switch as a second Codex config owner. See [optional multi-relay profiles](multi-relay-profiles.en.md).
-
-An endpoint may be stored as ordinary configuration if it contains no credentials. Tokens and signed URLs belong in the protected credential boundary.
-
-### History compatibility gate
-
-This stores a fingerprint of the history state that was explicitly inspected and prepared for a target mode. It should record:
-
-- scope of files and databases;
-- sizes and modification times;
-- stable identities where available;
-- manifest hash;
-- repair-tool version;
-- target compatibility rules.
-
-It must not contain conversation text.
-
-### Transaction journal
-
-The journal describes the previous and intended states, stages completed, field-level changes and rollback material. It is written durably before the first mutation.
-
-## Surgical configuration merge
-
-At switch time:
-
-1. parse the current live TOML;
-2. verify it still matches preflight expectations;
-3. remove or set only owned fields;
-4. preserve unknown tables, comments and unrelated additions when the chosen TOML library permits;
-5. serialize to a sibling temporary file;
-6. parse the temporary file again;
-7. replace the live file atomically using semantics verified for the current operating system and filesystem;
-8. verify the resulting effective configuration.
-
-If comment preservation matters and the parser cannot round-trip comments, use a syntax-aware editor or an explicitly tested narrow patcher. Do not fall back to global string replacement.
-
-## Profiles, accounts and providers
-
-Keep these concepts distinct:
-
-- A provider describes routing semantics.
-- An account describes an identity.
-- A credential snapshot enables an account or API identity.
-- A model choice may belong to a provider profile.
-
-Several official accounts can share the same official route but require different protected OAuth snapshots. Several API providers may use the same provider identity but require different base URLs, keys and model choices.
-
-For a current Codex build that passes the compatibility probe, the preferred shared identity is the built-in `openai` provider:
+This is a candidate structure from a validated case, to be tested on the installed version and target relay:
 
 ~~~toml
+# Shared identity; official OAuth mode has no relay endpoint override
 model_provider = "openai"
 ~~~
 
-Official profiles omit `openai_base_url`; API-compatible profiles set that top-level override. Do not define `[model_providers.openai]`, because the built-in identity is reserved. This contract must govern both the live configuration that creates future sessions and the separate history-preparation operation that normalizes old local session metadata. A profile must not silently choose a new provider label merely because its endpoint or model differs.
-
-This separation allows a user interface to show:
-
-~~~text
-Official
-  - Personal account
-  - Work account
-
-API-compatible
-  - Provider A / model family A
-  - Provider B / model family B
+~~~toml
+# Relay mode adds a top-level endpoint and activates its API credential
+openai_base_url = "https://relay.example/v1"
 ~~~
 
-The displayed hierarchy does not require swapping full configs.
+Do not also redefine model_providers.openai in this design. If the installed build lacks this override or the endpoint lacks the required protocol, adapt rather than forcing history to match an old example. Consult the [official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference) and probe the installed build.
 
-## First-use protocol
+Official OAuth and a direct OpenAI API key are different auth modes. An official API endpoint with an API key can be valid. A product limited to OAuth plus relay should classify it as an unsupported third mode, not automatically as corruption.
 
-Every first-use flow below is a durable multi-stage workflow. Persist a checkpoint before each required shutdown or restart, and do not mark a profile ready until a fresh Codex process has loaded and passed the expected probes. See [first use and restart checkpoints](first-use-bootstrap.en.md).
+## Merge the live configuration
 
-### Machine currently in official mode
+1. Parse current config and fingerprint it for detectable concurrent changes.
+2. Patch only explicitly owned fields; preserve unrelated tables, unknown keys and new user edits.
+3. Stage and reparse. Preserving comments and formatting requires a round-trip-safe editor; semantic reconstruction is not byte preservation.
+4. Recheck the live fingerprint and use a replacement mechanism verified for the filesystem.
+5. Validate effective config and auth kind, then verify a real request after restart.
 
-1. Validate that the route and credential are genuinely official.
-2. Register the current state as the first official profile.
-3. Protect a snapshot without exposing it.
-4. Ask the user to intentionally configure and test an API mode.
-5. Capture the API state only after a successful minimal request.
-6. Restore the requested final mode through the normal transaction engine.
+Do not swap entire config.toml copies. Unsupported TOML syntax should stop the narrow editor, not trigger replacement with a simplified template. Whole-config restoration belongs only to explicit recovery of a damaged file.
 
-If the API endpoint or key does not yet exist, collect endpoint/model intent and use a local secret-entry path before the staged restart. Do not ask for the key in chat.
+## One-action and advanced entrypoints
 
-### Machine currently in API mode
+A useful routine flow:
 
-Use the symmetric flow. Register and protect the known-good API state, then guide the user through one official login. The login must occur after removing route overrides that would send the OAuth-backed request to a relay.
+~~~text
+Select target → check writers and unfinished transactions → inspect current state
+              → quick history check; prepare when needed
+              → capture latest current credentials → activate owned fields and target auth
+              → local validation → restart guidance → real-use acceptance
+~~~
 
-The OAuth result must be inspected only after the login process and a subsequent clean shutdown have stabilized the credential store.
+Preparation and switching may share one user action, but preparation must finish before target auth activation. Explain why it is needed and report phase timings. If history mutation is outside authorization, ask first; declining does not establish old-thread compatibility.
 
-Before the first official activation, run the read-only local-history provider inventory. If it finds mixed or non-`openai` provider metadata and the shared-identity probe has passed, pause for explicit approval and complete the separate stopped-writer history preparation before activating OAuth. Do not hide that repair inside the credential transaction.
+Advanced options can expose read-only diagnosis, scoped history rollback, re-login and configuration recovery. Do not add menus simply to appear complete.
 
-### Inconsistent machine
+## Failure and interruption
 
-Examples include an official route with an API key, or an API endpoint with an OAuth snapshot intended for another route. Do not capture this as a valid profile. Explain the conflict and require the user to choose a recovery direction.
+Config files, auth files and multiple databases do not share one atomic transaction. Coordinate them with a durable stage journal; each SQLite database uses its own transaction. Failed recovery is an explicit state, not a generic “rolled back” message.
 
-## Switch transaction
-
-A robust transition follows these stages:
-
-1. validate source and target, then emit a short expiring maintenance marker before asking the user to close Codex;
-2. confirm all Codex writers and competing config managers are stopped;
-3. acquire an exclusive switch lock and revalidate source state, target profile and live-file identity;
-4. check the target history gate when required;
-5. write and flush the recovery journal;
-6. preserve the current credential as its source profile snapshot;
-7. stage the new live configuration;
-8. stage and activate the target credential;
-9. verify file permissions and parseability;
-10. validate route/auth/model consistency;
-11. commit the journal and instruct the user to reopen Codex;
-12. clear the marker after validation or rollback; expiry must prevent permanent suppression after a crash.
-
-If any stage fails, rollback should use the journal and verify the restored state. Never continue from a half-applied state merely because the UI still opens.
-
-## Keeping live configuration current
-
-Because each switch begins from the live file, a plugin installed yesterday or an MCP server edited today survives. Profile data contributes only owned values. This is the central reason to prefer a merge-based switcher over whole-file snapshots.
-
-When the owned-field schema changes, migrate the manifest explicitly and retain the previous schema version for rollback.
+Useful states include uninitialized, missing target credentials, preparing, activated/pending restart, verified usable, re-login required and recovery required. Capture stable refreshed OAuth credentials instead of overwriting them with an old snapshot. See [first use](first-use-bootstrap.en.md) and [safety and rollback](safety-and-rollback.en.md).
