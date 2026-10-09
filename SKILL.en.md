@@ -24,6 +24,7 @@ The one configuration writer principle coordinates routing ownership; it does no
 1. Read [architecture](references/architecture.en.md). Separate route, credentials, history and post-restart verification states. Define acceptance for the capabilities the user selected.
 2. Handle no official login yet, no API/relay configuration yet, expired credentials and incomplete profiles through [first use](references/first-use-bootstrap.en.md). The user completes actual login; the tool persists progress, never fabricates OAuth.
 3. For cross-mode old-thread continuity, read [history compatibility](references/history-compatibility.en.md). Common provider identity and response-item compatibility are separate tasks. Paginated history also has projection and inheritance invariants.
+   Do not check only `item_`/`rs_` prefixes and length: reasoning with an ID but no replayable content can still trigger an unsupported persisted-item lookup; use the projection evidence in the reference before removing only a model copy.
 4. A routine one-action flow may be: stopped-writer check → quick readiness check → necessary preparation → route/credential transaction → restart and acceptance guidance. Separate internal stages without forcing multiple manual commands.
 5. Implement failure paths using [safety and rollback](references/safety-and-rollback.en.md), and test selected capabilities with [validation](references/validation.en.md). Failed preparation must precede activation of target credentials.
 

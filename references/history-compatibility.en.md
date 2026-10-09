@@ -31,10 +31,13 @@ Check semantic type, prefix, length, required fields and references, not just it
 | Already valid for the target protocol | Leave unchanged |
 | Incompatible ordinary message/tool item ID | Map only with verified type/references, collision checks and tested rules |
 | rs_ prefix but excessive length | Still invalid; a valid prefix is insufficient |
+| Reasoning has a valid ID but no `content` or `encrypted_content` (including a blank/zero-width summary) | It is still not replayable; the official endpoint may treat it as a persisted-item lookup. Remove only the model-input copy after UI provenance is verified and no turn references it |
 | Missing protected reasoning content | Renaming cannot make it valid; disclose the effect and remove only a proven model-input copy |
 | Unverifiable encrypted reasoning, unknown type or unclear references | Stop and investigate; do not truncate IDs or invent fields |
 
 One observed incident had 79-character reasoning IDs. The old prefix-only scanner missed them; tests were added for a 64-character limit on that target protocol. Bind limits to version/protocol evidence rather than every endpoint forever. Never manually bump an old readiness record to bypass new rules.
+
+A later review found that a legal `rs_` prefix is not enough: a relay may store only an ID and a blank summary, with no replayable body. The official endpoint can then return an error saying that a persisted-item lookup is required but unsupported. Scan content presence as well as prefix and length; neither prefix nor length alone proves compatibility.
 
 Response-item IDs, call_id and tool-result relationships are distinct. Preserve call/result pairing, inspect parent-response and UI references, and detect collisions. Provider-side stored response state may also be nonportable; verify the client's actual replay path instead of bulk-replacing strings.
 
@@ -53,6 +56,8 @@ Continuation filenames may resemble “timestamp-logicalID_segmentID”: metadat
 
 - **Projection directly from model records:** coordinate database rows and turn references while preserving visible content. Removing the sole visible copy or leaving references cannot be treated as automatically safe.
 - **Projection from independent UI events:** prove each row's event source, logical task, turn, ID, type and ordinal. A model response_item may arrive later, so the two ordinals need not match. Repair the model copy and prove UI rows, turns, inheritance and cursors remain unchanged.
+
+An older segment may have an independent visible Reasoning event but no `thread_items` row for the adjacent model `response_item`. Allow a model-only removal only after all remaining UI provenance is verified and `thread_turns` has no reference to that model ID; otherwise refuse.
 
 For unusable model input, one copy-tested approach uses a client-ignored non-model event at the original position, preserving byte length and ordinal. This placeholder format is not universal. The installed native client must prove old-content visibility and indexing of appended events.
 

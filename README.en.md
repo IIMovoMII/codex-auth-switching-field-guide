@@ -73,7 +73,7 @@ If CC Switch or another manager owns the same config, choose one routing owner t
 
 Field evidence is primarily from Windows. Adapt the design to macOS or Linux using local equivalents; **there is no claim of a finished or fully tested three-platform application**.
 
-This revision includes copied-history tests using native Codex CLI 0.159.2, record-by-record checks after a real switch, and regression tests on PowerShell 5.1 and 7. See [validation](references/validation.en.md) for evidence, gaps and measurements. The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
+This revision includes copied-history tests using native Codex CLI 0.159.2, a later 0.162.0-alpha.2 isolated review of legal IDs with no replayable reasoning content, record-by-record checks after a real switch, and regression tests on PowerShell 5.1 and 7. See [validation](references/validation.en.md) for evidence, gaps and measurements. The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
 
 ## Contribute
 

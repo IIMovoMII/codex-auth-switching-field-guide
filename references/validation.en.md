@@ -17,6 +17,7 @@ Environment: Windows, native Codex CLI 0.159.2; local scripts supporting PowerSh
 | Chinese and shell compatibility | Both PowerShell generations passed Chinese output, proxy switching, history and decoder tests | Not a tested three-platform app |
 | Performance | The same read-only projection-evidence check fell from 133.53 to 11.85 seconds while retaining the same rejection result; a separate full scan took about 8.46 seconds | Component benchmark, not total switching time or proof that this thread passed the repair gate |
 | Fast readiness | Unrelated logs do not invalidate preparation; history tables under unfamiliar filenames still count; rule-hash changes invalidate stale readiness | Metadata fingerprinting is not tamper-proof content validation |
+| Unreplayable reasoning items | A read-only scan of 405 local history files found 7 legal `rs_` items across 2 paginated files with no replayable content; an isolated copy preserved 7 UI items and indexed an appended event | Evidence is for this local layout/client copy; production repair still needs the shutdown gate and separate acceptance |
 
 A recorded real transaction took about 29 seconds for backup, mutation and recheck, excluding scanning/planning. That does not contradict several minutes observed by the user. Retest the same component and never create speed by turning a rejection into acceptance.
 
@@ -42,6 +43,7 @@ Cover the supported layouts' relevant boundaries:
 - shorter, longer and equal-width providers; insufficient paginated space rejected;
 - valid, generic and overlong IDs, target protocol length boundaries, collisions and unknown types;
 - protected reasoning, independent visible events and tool call/result pairing;
+- legal-prefix reasoning with only an ID/blank summary, older segments without a model projection row, and refusal when a turn references the item;
 - direct model projections versus event projections, logical IDs versus storage segment IDs;
 - nonzero inherited baselines, missing segments, invalid ordinals/byte cursors and incomplete indexing;
 - appended events after repair, reopening, repeated rollback and newer activity;

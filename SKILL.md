@@ -24,6 +24,7 @@ description: 按本机环境设计、审查或修复 Codex 官方 OAuth 与 API 
 1. 读取[总体设计](references/architecture.md)，明确路线、凭据、历史和重启验证的独立状态。针对用户已选择的能力建立验收条件。
 2. 从未官方登录、从未配置 API、认证过期或只有半套档案时，走[首次使用](references/first-use-bootstrap.md)。用户真实完成登录，工具保存进度；不能伪造 OAuth。
 3. 旧任务要跨模式续聊时，走[历史兼容](references/history-compatibility.md)。共同 provider 身份和响应项目编号兼容是两项不同工作；分页历史还必须维护索引和继承关系。
+   不要只看 `item_`／`rs_` 前缀和长度：只有编号、没有可重放内容的 reasoning 也可能触发官方持久化项目查找错误；按参考中的投影证据决定是否只移除模型副本。
 4. 日常入口可以是一键切换：停写检查 → 快速就绪检查 → 必要的历史准备 → 路线与凭据事务 → 提示重启及后续验收。分离内部阶段，不强迫用户手工执行多条命令。
 5. 根据[安全与回滚](references/safety-and-rollback.md)实现失败路径，用[验证清单](references/validation.md)测试所选能力。准备失败必须发生在启用目标凭据之前。
 
