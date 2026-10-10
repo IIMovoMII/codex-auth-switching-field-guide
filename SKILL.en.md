@@ -28,12 +28,15 @@ The one configuration writer principle coordinates routing ownership; it does no
 4. A routine one-action flow may be: stopped-writer check → quick readiness check → necessary preparation → route/credential transaction → restart and acceptance guidance. Separate internal stages without forcing multiple manual commands.
 5. Implement failure paths using [safety and rollback](references/safety-and-rollback.en.md), and test selected capabilities with [validation](references/validation.en.md). Failed preparation must precede activation of target credentials.
 
+Keep responsibilities clear: centralize switch sequencing, failure handling and transaction coordination; isolate version-dependent config/auth representations, history and transport decisions. A few functions or files are sufficient, with no plugin framework or resident service required. Implement only selected capabilities; see architecture for upgrade and cache rules.
+
 ## Conditional routes
 
 - Multiple providers, models or reasoning levels: [multi-relay profiles](references/multi-relay-profiles.en.md).
 - Empty/template-overwritten config or CC Switch coexistence: [config recovery](references/config-recovery.en.md).
 - First-turn retries, proxies or timeouts: [network diagnostics](references/network-diagnostics.en.md).
 - Slow switching: measure scanning, projection proof, backup/repair and credential activation separately. Do not remove safety gates for speed; see the history guide's performance section.
+- After a Codex update: establish whether relevant behavior remains covered by verified rules. A new version does not necessarily need a code change, and unchanged table structure does not prove unchanged behavior. Keep unknown compatibility write-gated and update readiness evidence only after verification.
 
 ## Invariants
 

@@ -49,6 +49,8 @@ The agent should inspect facts it can safely read and ask only for decisions you
 
 These are selectable product capabilities, not an installer or implementation shipped by this repository.
 
+The field evidence mainly covers switching between one official account and one relay on Windows. A complete first-use wizard, multiple accounts and multiple relays are design options requiring implementation and acceptance on the user's machine.
+
 ## What “keep my conversations” means
 
 The goal is to preserve local messages, tool results, project placement, and the ability to open and continue the original task.
@@ -63,11 +65,19 @@ History validation often costs more than changing credentials. Unchanged history
 
 One investigation traced minutes of delay to per-byte decoding in an interpreted script. Measure stages and optimize the actual bottleneck instead of skipping validation. First-use setup and routine switching should also report separate progress.
 
+## Handling Codex updates
+
+A Codex update does not automatically require rewriting the switcher. Check whether the changes affect switching; reuse compatible behavior and adapt the affected parts when necessary. Reuse valid checks for routine switching, reserve full history checks for cases that need them, and explain what is taking time.
+
+When history compatibility cannot be established, stop before switching and preserve the current state. Keeping this fail-before-switch behavior reduces accidental changes but cannot guarantee that future errors never occur. Multiple accounts and elaborate interfaces are optional; a two-mode switcher need not implement everything.
+
 ## First use and recovery
 
 You can start without a previous official login, but you still need to complete the first OAuth login yourself. Some checks require a full Codex restart; the tool should save progress and explain the next action, not claim completion early.
 
 If CC Switch or another manager owns the same config, choose one routing owner to avoid competing writes. An empty, template-only or broken config can be restored from one known-good copy. Without a backup, rebuild from trustworthy evidence. See [first use](references/first-use-bootstrap.en.md) and [config recovery](references/config-recovery.en.md).
+
+Saving multiple official accounts does not automatically share cloud chats. Visibility and continuation across accounts need separate tests; this guide has no completed two-official-account acceptance. If chats disappear from view, check identity, data location and filters before concluding that records were deleted.
 
 ## Scope and evidence
 

@@ -41,3 +41,7 @@ On a build with proven shared-provider support, official accounts use openai wit
 One entrypoint may check state, prepare history when needed and activate the target. Explain history invalidation and progress; failed preparation retains current auth. Advanced menus handle adding, updating, diagnosing and recovering without making every routine switch a manual procedure.
 
 CC Switch is not required. A self-managed profile implementation can stop it from writing this Codex config without uninstalling it for unrelated uses. Do not let uncoordinated managers overwrite the same live file.
+
+Test official profiles separately with A→B→A. Verify account/workspace identity, assignment of refreshed credentials, old-task visibility/opening/continuation and new-message indexing. This guide has no completed two-official-account test. Neither one successful relay→official switch nor a presumed account boundary proves universal portability or inevitable cross-account reasoning failure.
+
+Local task files, UI indexes and cloud Chat/Work are different data sources. A shared provider ID does not transfer cloud permissions. If messages become invisible, inspect data directories, projects, archive/filter settings and identity before deleting indexes or files to force synchronization. Choose shared history or isolated directories based on requirements. Separate CODEX_HOME directories isolate local files but do not establish isolation of every Desktop login and cloud cache; verify the actual launch mechanism.

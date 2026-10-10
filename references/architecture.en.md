@@ -15,6 +15,24 @@ A profile stores intent: identity, label, auth kind, endpoint, credential refere
 
 Native profiles, project configuration, CLI flags and environment variables can affect effective values. Inspect more than the user-level file. Coordinate one routing writer; see [config recovery](config-recovery.en.md) for competing managers such as CC Switch.
 
+## Isolate version changes in adapters
+
+Centralize target selection, checks before activation, transaction coordination and failure handling. Isolate version-dependent config/auth formats, history tables, pagination cursors, response identifiers and transport capabilities in separate functions or files. Group supported versions by verified behavior/layout rather than duplicating code for each release. Stable means less exposed to change; auth and configuration can change too.
+
+A version change triggers review of the relevant capabilities. Do not reject every new version solely by its number or treat an unchanged SQLite schema as proof of unchanged semantics. Consider the runtime actually used by Desktop, layout, rules and native read/append-index tests on isolated copies; a CLI on PATH is not evidence for Desktop. If the existing implementation passes, update evidence without a code patch; adapt the affected part when incompatible. Insufficient evidence gates dependent writes. If old-thread continuity is required, unknown history readiness still blocks target credential activation.
+
+Preserve unrelated additional fields in a known layout. Stop for unknown fields that affect interpretation, references or recovery of the targeted records. Unknown must not mean delete, guess or bypass. Empty-file and stale-index repairs belong to explicitly scoped maintenance, not opportunistic whole-state cleanup during routine switching.
+
+Match implementation size to the selected capabilities. Layering requires no plugin manager, update downloader or background scanner. Add multiple accounts, elaborate interfaces or further repair types only when needed. Separation helps contain changes; it does not guarantee every upgrade changes only one component. Network or provider errors must not automatically trigger history repair.
+
+## Fast path and invalidation
+
+The fast path reuses a scoped compatibility result. Skip full transcript scans, repeated backups and network probes without an invalidation reason only while relevant client behavior, target route/protocol, checked data and dependencies, and repair rules still match. Menu text and unrelated log changes should not invalidate history readiness; actual behavior/rule changes cannot be hidden by retaining an old version label.
+
+A simple implementation may recheck all relevant history when it changes, with measured timings. Add per-file or per-segment caching only when data volume warrants it. Appends, rewrites, truncation, moves, archives, related databases and WAL, parent segments and inherited history must invalidate the affected results. Incremental checks cover dependent records, not just the final lines. Recheck or stop on damaged caches or uncertain dependencies rather than assuming readiness.
+
+Do not promise a fixed number of seconds or treat a timeout as permission to proceed. Measure startup, scanning, projection checks, backup/mutation and rechecks on the same data with equivalent decisions. Explain slow checks and progress; required history preparation always finishes before credential activation.
+
 ## Shared provider identity
 
 This is a candidate structure from a validated case, to be tested on the installed version and target relay:

@@ -34,6 +34,8 @@ Private local tests/data are not distributed here. The reusable material is the 
 | Damaged config | Empty/invalid/template-only config, missing fields and concurrent edits recognized; known-good and no-backup recovery exercised |
 | One-action flow | Uninitialized, valid readiness, stale readiness and failed preparation converge; history failure precedes auth activation |
 | Logs/capacity | Redacted errors, stage timing and bounded retention; stop before sacrificing the only recovery material |
+| Version update | Reuse the implementation when relevant behavior remains verified-compatible; reject unchanged-schema cases whose read semantics changed; uncertain compatibility gates dependent writes and switching |
+| Multiple official accounts | Validate old-task visibility, opening, model continuation and new-message indexing per account; account A's success cannot stand in for account B |
 
 ## History fixtures
 
@@ -56,6 +58,10 @@ Accept old-content visibility, model continuation and new-message indexing separ
 Inject risks relevant to the implementation: concurrent switching, locked files, denied writes, full disk, unreadable snapshots, interrupted writes, rollback failure and intervening user config edits. Outcomes should be restored source, verified target, pending restart/login, or a clearly recoverable unknown state, never vague partial success.
 
 After Codex updates, recheck config, auth, history layout and transport. Preserve data and disable unverified history mutation until adapted; do not manually increase readiness version numbers. Upgrade detection can be cheap; expensive probes should run for a reason, not on every invocation.
+
+Component tests cover coordination/recovery and version-dependent config/auth/history/transport separately. Retain one-action integration tests proving that every required preparation failure prevents target activation. Module boundaries do not replace end-to-end validation.
+
+If check caching is implemented, test that unchanged history, unrelated logs and menu edits avoid full preparation, while relevant behavior/rule changes invalidate it. Truncation, rewrites, moves, archives and parent-segment/database changes invalidate dependent results. Incremental and full checks must agree on the same snapshot. Report fast/slow-path timings and read scope at actual data sizes. Untested caching and performance claims remain design proposals, not shipped capabilities.
 
 ## Repository-check limits
 
