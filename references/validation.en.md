@@ -4,7 +4,7 @@
 
 Validate the selected capabilities; do not present a suggested checklist as already tested. This repository ships no switcher. The evidence below is separate from acceptance criteria for a future implementation.
 
-## Evidence behind this revision
+## Earlier field evidence
 
 Environment: Windows, native Codex CLI 0.159.2; local scripts supporting PowerShell 7 and Windows PowerShell 5.1. Recorded on 2026-10-01, not a pass for future versions or other operating systems.
 
@@ -22,6 +22,19 @@ Environment: Windows, native Codex CLI 0.159.2; local scripts supporting PowerSh
 A recorded real transaction took about 29 seconds for backup, mutation and recheck, excluding scanning/planning. That does not contradict several minutes observed by the user. Retest the same component and never create speed by turning a rejection into acceptance.
 
 Private local tests/data are not distributed here. The reusable material is the reasoning, boundaries and test design below, not a certificate for someone else's deployment.
+
+## Evidence added on 2026-10-12
+
+Environment: Windows, Desktop's native runtime `0.162.0-alpha.17.2`. See the [continuation case study](continuation-case-study.en.md) for reproduction and verified write scope.
+
+| Check | Observed evidence | Limit |
+| --- | --- | --- |
+| Actual official continuation | Production repair code processed an isolated failing copy; real official WebSocket warmup and continuation with `previous_response_id` succeeded while preserving content, encrypted reasoning and compaction | Fresh-request success does not establish this path; only relevant types and paginated layouts were verified, not permission to clear IDs for every service |
+| Full-copy repair and rollback | 415 files and 3 related databases; 392 files and 243,163 model records passed line-by-line field checks, database hashes remained unchanged, and every file rolled back exactly | Copy tests contained no real auth and made no production changes; request validation was separate |
+| Boundary layouts | Empty projection, materialized fork with copied parent inheritance metadata, and a segment damaged by an older repair passed native-copy reading and append indexing; wrong provenance and changed backups still refused | Does not establish safety for arbitrary empty tables or mixed metadata |
+| Stopped-writer production run | 392 files applied; optional IDs cleared in 243,244 model records, one unreplayable reasoning item replaced in its byte slot, and zero database writes. After reopening, all repaired-prefix hashes matched, critical files passed content/byte-boundary checks, and three databases passed integrity checks | The current chat continued, compacted and indexed new messages; the original failing task was reloaded but not individually exercised with a new real task. Not acceptance for every old conversation |
+| Scale and timing | Roughly 2.5 GB copy: scanning 38.2 s, projection checks 109.5 s, backup/mutation/recheck 165.6 s; full copy/comparison/rollback exercise about 359 s | Not routine-switch timing or a cross-machine performance guarantee |
+| Interruption review | Config recovery and history recovery distinguished; unified history startup recovery gate identified as a hardening gap | Forced-termination/power-loss automatic history recovery has not completed acceptance and is not an existing capability |
 
 ## Minimum implementation acceptance
 
@@ -46,7 +59,9 @@ Cover the supported layouts' relevant boundaries:
 - valid, generic and overlong IDs, target protocol length boundaries, collisions and unknown types;
 - protected reasoning, independent visible events and tool call/result pairing;
 - legal-prefix reasoning with only an ID/blank summary, older segments without a model projection row, and refusal when a turn references the item;
+- legal IDs with complete encrypted content failing after native warmup; repair changes only designated old model IDs, preserving tool pairing, guardian history, UI IDs and newly generated IDs;
 - direct model projections versus event projections, logical IDs versus storage segment IDs;
+- empty projections versus dangling references, materialized forks with copied parent metadata, proven backup/manifest layout recovery and refusal when evidence is insufficient;
 - nonzero inherited baselines, missing segments, invalid ordinals/byte cursors and incomplete indexing;
 - appended events after repair, reopening, repeated rollback and newer activity;
 - changed rules, related database changes, unrelated log changes and damaged readiness records.
@@ -56,6 +71,8 @@ Accept old-content visibility, model continuation and new-message indexing separ
 ## Failure and upgrades
 
 Inject risks relevant to the implementation: concurrent switching, locked files, denied writes, full disk, unreadable snapshots, interrupted writes, rollback failure and intervening user config edits. Outcomes should be restored source, verified target, pending restart/login, or a clearly recoverable unknown state, never vague partial success.
+
+Interrupt after file replacement but before the manifest update, and after some files are applied but before database work. Restart the entrypoint and verify reconciliation precedes any new transaction. Manual rollback and caught-exception tests do not establish this capability. Do not claim recovery without real forced-termination testing; power loss and storage-hardware failures retain separate limits.
 
 After Codex updates, recheck config, auth, history layout and transport. Preserve data and disable unverified history mutation until adapted; do not manually increase readiness version numbers. Upgrade detection can be cheap; expensive probes should run for a reason, not on every invocation.
 

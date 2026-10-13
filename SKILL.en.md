@@ -23,8 +23,8 @@ The one configuration writer principle coordinates routing ownership; it does no
 
 1. Read [architecture](references/architecture.en.md). Separate route, credentials, history and post-restart verification states. Define acceptance for the capabilities the user selected.
 2. Handle no official login yet, no API/relay configuration yet, expired credentials and incomplete profiles through [first use](references/first-use-bootstrap.en.md). The user completes actual login; the tool persists progress, never fabricates OAuth.
-3. For cross-mode old-thread continuity, read [history compatibility](references/history-compatibility.en.md). Common provider identity and response-item compatibility are separate tasks. Paginated history also has projection and inheritance invariants.
-   Do not check only `item_`/`rs_` prefixes and length: reasoning with an ID but no replayable content can still trigger an unsupported persisted-item lookup; use the projection evidence in the reference before removing only a model copy.
+3. For cross-mode old-thread continuity, read [history compatibility](references/history-compatibility.en.md). Common provider identity and response-item compatibility are separate tasks. Verify and preserve pagination projections and inheritance.
+   Prefix, length and reasoning-content checks are insufficient: legal IDs with encrypted content can still trigger server lookup during native continuation after warmup. For that error or a proposed old-ID change, read the [continuation case study](references/continuation-case-study.en.md) and reproduce the actual request path first. Clear only old model-input IDs proven optional through type, reference and native-copy checks, never every ID or the reasoning content.
 4. A routine one-action flow may be: stopped-writer check → quick readiness check → necessary preparation → route/credential transaction → restart and acceptance guidance. Separate internal stages without forcing multiple manual commands.
 5. Implement failure paths using [safety and rollback](references/safety-and-rollback.en.md), and test selected capabilities with [validation](references/validation.en.md). Failed preparation must precede activation of target credentials.
 
@@ -47,6 +47,7 @@ Keep responsibilities clear: centralize switch sequencing, failure handling and 
 - Do not truncate or fabricate reasoning IDs/encrypted payloads, break tool pairing or create paginated ordinal gaps by deleting lines.
 - Unknown layouts, inconsistent provenance or concurrent changes require a stop, not a manually bumped readiness version.
 - Rollback cannot overwrite activity created after the repair. If reversal is unsafe, expose a clear manual-recovery state.
+- Inspect durable manifests before starting new switching or repair when history work is unfinished. Accept exception handling, config recovery and history crash recovery separately; proposed recovery capabilities are not implemented capabilities.
 - Report file activation, local checks and new-process real-request verification separately.
 
 ## Handoff

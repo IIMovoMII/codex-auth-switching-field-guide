@@ -59,6 +59,12 @@ However, **visible messages do not prove the model can accept every old input**.
 
 Acceptance has three parts: **old content remains visible, the model can continue, and new messages are saved and displayed.** This is not a permanent guarantee across every future Codex version, account or relay.
 
+### A recent failure
+
+An October 2026 investigation found that a scanner could report zero findings while an old conversation still failed after switching to official mode, including during compaction. Identifier syntax was not the whole problem: the client's continuation path referenced old items the official service could not resolve. The investigation also found one pagination-offset mismatch left by an older repair.
+
+The lesson is to **reproduce the actual failing continuation path, preserve content and UI history, and validate repair and recovery**, not to bulk-rename every conversation. See the [case study](references/continuation-case-study.en.md) for the evidence and limits.
+
 ## Why switching can sometimes be slow
 
 History validation often costs more than changing credentials. Unchanged history can use a fast check; new relay records, Codex updates or changed repair rules may require preparation again.
@@ -83,7 +89,7 @@ Saving multiple official accounts does not automatically share cloud chats. Visi
 
 Field evidence is primarily from Windows. Adapt the design to macOS or Linux using local equivalents; **there is no claim of a finished or fully tested three-platform application**.
 
-This revision includes copied-history tests using native Codex CLI 0.159.2, a later 0.162.0-alpha.2 isolated review of legal IDs with no replayable reasoning content, record-by-record checks after a real switch, and regression tests on PowerShell 5.1 and 7. See [validation](references/validation.en.md) for evidence, gaps and measurements. The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
+Evidence includes native Codex CLI 0.159.2 pagination-copy tests, a 0.162.0-alpha.2 review of unreplayable reasoning, and 0.162.0-alpha.17.2 official warmup/continuation comparisons, full-copy repair and rollback, and read-only checks after a stopped-writer production run. PowerShell 5.1 and 7 regressions were also exercised. See [validation](references/validation.en.md) for evidence, gaps and measurements. Automatic recovery after forced termination or power loss during history repair has not completed acceptance and must not be presented as an existing capability. The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
 
 ## Contribute
 

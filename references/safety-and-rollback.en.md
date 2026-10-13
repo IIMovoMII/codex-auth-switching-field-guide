@@ -25,6 +25,10 @@ History preparation precedes auth switching. If history is prepared successfully
 
 A durable manifest coordinates history files; each SQLite database has its own transaction. On unfinished work, classify each target as original, applied or unknown before continuing or rolling back. Without implemented and tested crash recovery, provide an honest manual path rather than claiming universal automatic recovery.
 
+An October 2026 code review found startup recovery for unfinished config/auth transactions, but no equivalent unified startup gate for history repair. Successful exception rollback does not prove automatic recovery after forced termination. This remains a hardening gap; see the [case study](continuation-case-study.en.md). Publishing this experience did not modify the local program. A new implementation should detect unfinished or rollback-failed history manifests before creating another plan, stop and reconcile first, and retain unknown states for manual recovery rather than hiding them through retries.
+
+Do not wire a one-off rescue patch with fixed task IDs, line numbers or ordinals into routine switching. Isolate retained incident-study material from the production writer; helper scripts must not bypass shutdown and verified-scope requirements.
+
 ## Rollback must not erase newer activity
 
 - Verify identity, hashes, record location and expected values before reversing journaled changes.

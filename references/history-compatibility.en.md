@@ -28,8 +28,9 @@ Check semantic type, prefix, length, required fields and references, not just it
 
 | Finding | Action |
 | --- | --- |
-| Already valid for the target protocol | Leave unchanged |
+| Replayability verified on the target client's actual continuation path | Leave unchanged; identifier syntax alone is insufficient |
 | Incompatible ordinary message/tool item ID | Map only with verified type/references, collision checks and tested rules |
+| Legal ID and replayable content, but native continuation after warmup still requires persisted lookup | Compare actual requests first; clear an old model-input ID only when proven optional and preserve content. Another valid-looking ID cannot reconstruct server state |
 | rs_ prefix but excessive length | Still invalid; a valid prefix is insufficient |
 | Reasoning has a valid ID but no `content` or `encrypted_content` (including a blank/zero-width summary) | It is still not replayable; the official endpoint may treat it as a persisted-item lookup. Remove only the model-input copy after UI provenance is verified and no turn references it |
 | Missing protected reasoning content | Renaming cannot make it valid; disclose the effect and remove only a proven model-input copy |
@@ -40,6 +41,12 @@ One observed incident had 79-character reasoning IDs. The old prefix-only scanne
 A later review found that a legal `rs_` prefix is not enough: a relay may store only an ID and a blank summary, with no replayable body. The official endpoint can then return an error saying that a persisted-item lookup is required but unsupported. Scan content presence as well as prefix and length; neither prefix nor length alone proves compatibility.
 
 Response-item IDs, call_id and tool-result relationships are distinct. Preserve call/result pairing, inspect parent-response and UI references, and detect collisions. Provider-side stored response state may also be nonportable; verify the client's actual replay path instead of bulk-replacing strings.
+
+### Valid IDs can still fail across services
+
+On 0.162.0-alpha.17.2, the same old history succeeded in a fresh request but failed in native WebSocket continuation after warmup with `previous_response_id`. The verified paginated repair preserved content and encrypted payloads, setting specific old model `.id` values to `null` within their original byte slots. It did not delete reasoning. See the [case study](continuation-case-study.en.md).
+
+Validated locations were `response_item.payload.id` and `compacted.payload.replacement_history[*].id`, limited to natively recognized types allowing a null ID. This does not authorize changing `call_id`, UI event IDs, turn references, guardian history or IDs generated during the current turn. Other layouts, required IDs and unexplained references need separate validation.
 
 ## Paginated history: the fragile layer
 
@@ -61,7 +68,11 @@ An older segment may have an independent visible Reasoning event but no `thread_
 
 For unusable model input, one copy-tested approach uses a client-ignored non-model event at the original position, preserving byte length and ordinal. This placeholder format is not universal. The installed native client must prove old-content visibility and indexing of appended events.
 
+An empty UI projection does not necessarily mean corruption; a materialized fork containing copied parent metadata is not necessarily a mixed-thread file. Verify ownership, cursors, turn references and the compacted baseline, then exercise native reading and append indexing on copies. Accept only proven layouts: neither delete records merely because a table is empty nor disable provenance checks globally.
+
 Never delete JSONL lines and create ordinal gaps. Equal character counts do not imply equal UTF-8 byte lengths; replacements must fit and preserve line endings. A provider shorter than openai may not fit: stop instead of shifting later offsets. Reordering requires a verified native rebuild of the segment, inherited baseline and new-event projection. Without that path, retain the gate.
+
+If an earlier repair already shortened a file, do not guess ordinals from current line numbers or pad the file tail to match a cursor. Construct a recovery copy only when the original backup, old manifest, current hash, line-by-line differences and original database boundaries jointly prove the layout. Stop after later activity or insufficient evidence. A failed recovery returns to this operation's starting state, not an unconditional restoration of an older whole file.
 
 ## Formal transaction
 
