@@ -29,6 +29,8 @@ REQUIRED = {
     "references/history-compatibility.en.md",
     "references/continuation-case-study.md",
     "references/continuation-case-study.en.md",
+    "references/incremental-preparation.md",
+    "references/incremental-preparation.en.md",
     "references/multi-relay-profiles.md",
     "references/multi-relay-profiles.en.md",
     "references/network-diagnostics.md",

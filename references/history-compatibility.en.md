@@ -59,6 +59,8 @@ A validated case uses thread_history_1.sqlite; filenames, tables and fields rema
 
 Continuation filenames may resemble “timestamp-logicalID_segmentID”: metadata and events retain the logical ID, while SQLite uses the segment ID. Do not validate a continuation against the original segment's cursor or trust a suffix alone. Cross-check metadata, filename and inheritance boundary. Stop for missing segments or inconsistent evidence.
 
+Separate history maintenance may have materialized a dual-ID segment into complete history without `history_base`. A 2026-10-13 patch accepted a specific layout: continuous ordinals from zero, consistent ownership of every metadata/event record, no unresolved inheritance, and verified storage-segment cursor and independent UI sources. Preserve both IDs. Missing inheritance alone proves neither corruption nor safety. Do not opportunistically rewrite parent relations or add history detachment/old-chat deletion to routine switching.
+
 ### Two validated projection paths
 
 - **Projection directly from model records:** coordinate database rows and turn references while preserving visible content. Removing the sole visible copy or leaving references cannot be treated as automatically safe.
@@ -83,7 +85,7 @@ Default to stopped Desktop, CLI and other state writers:
 3. Persist the plan, before/after values, file identity and rollback material before applying.
 4. Structurally rewrite ordinary history when safe; preserve positions in paginated history. Use explicit row-scoped transactions per database.
 5. Validate JSON, byte/ordinal boundaries, tool pairing, provenance, untouched content and database integrity.
-6. Run final compatibility checks and save readiness bound to the repair rules.
+6. Recheck compatibility across the managed scope: valid evidence may cover unchanged ranges, while changed ranges are revalidated. Do not merely count this run's edits. Bind readiness to rules, data and the check cache.
 
 Files and databases are not one atomic transaction. See [safety and rollback](safety-and-rollback.en.md) for exceptions and crash recovery. A live single-task rescue does not authorize bulk migration; cached settings can write old provider values again.
 
@@ -98,11 +100,13 @@ Bind readiness to:
 - target provider/protocol and repair-rule version or hash;
 - validated client/history-layout version and preparation manifest.
 
+Keep per-file evidence separate from final readiness. Missing/damaged caches or pending transactions cannot pass readiness. See [incremental preparation](incremental-preparation.en.md) for complete-versus-incremental checking, prefix hashes, UI-witness reuse and fixed-slot backups. Read-only scanning must not produce a preparation credential; forced-complete checking must not reuse old file conclusions.
+
 Metadata fingerprints detect normal changes, not adversarial tampering. Add content hashes when stronger assurance is required. Exclude unrelated logs by schema; unfamiliar filenames with history tables still count. Genuine history changes must invalidate readiness.
 
 Measure scanning, projection proof, backup/mutation/recheck and credential activation separately. Timing only the write phase is not total switching time. In one investigation, PowerShell per-byte text decoding dominated; equivalent compiled decoding reduced it substantially without removing checks.
 
-“Only the first switch is slow” is false: new relay records, databases, rules or client changes can require preparation. Invalidate outdated zero-finding results when rules change.
+“Only the first switch is slow” is false: new relay records, databases, rules or client changes can require preparation. Appends may need only incremental parsing rather than a full scan; changed rules still invalidate outdated zero-finding results.
 
 ## Completion criteria
 

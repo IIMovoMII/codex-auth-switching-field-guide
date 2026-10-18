@@ -4,6 +4,8 @@
 
 Recorded on 2026-10-13; experiments and the stopped-writer run took place on 2026-10-12. Environment: Windows and Desktop's native runtime `0.162.0-alpha.17.2`. This redacted account includes no local repair program, real transcripts, credentials or backups.
 
+Follow-up: the hardening gap below describes the incident-time state. On 2026-10-14, incremental preparation and a pending-history recovery gate were added and passed copy/simulated-interruption tests, not actual power loss or every forced-termination point. See [incremental preparation](incremental-preparation.en.md) and [validation](validation.en.md) for subsequent evidence.
+
 ## One error, two gaps
 
 Old-thread continuation and context compaction after switching to official mode returned:
@@ -56,7 +58,7 @@ Preparation on a roughly 2.5 GB copy took about 313 seconds; the complete copy/c
 
 ## Lessons for future implementations
 
-Keep failed-preparation-before-switch behavior, and extend it to startup after interrupted history work: detect unfinished or rollback-failed manifests, reconcile original/applied/unknown states, and decide recovery before new work. Stop when reconciliation is unsafe. Caught exceptions and config recovery do not prove history power-loss recovery. This remains a local hardening gap; this update records the experience without implementing that capability.
+Keep failed-preparation-before-switch behavior, and extend it to startup after interrupted history work: detect unfinished or rollback-failed manifests, reconcile original/applied/unknown states, and decide recovery before new work. Stop when reconciliation is unsafe. Caught exceptions and config recovery do not prove history power-loss recovery. This was a local gap at incident time; see the opening follow-up for subsequent scope and limits. No finished program is distributed here.
 
 Retain one-action entrypoints and a few clear modules rather than building a general Codex repair suite. Separate verified rules, the production writer and one-off rescue material. Unknown cases stop; timeouts, 503 responses and model capacity must not automatically trigger history cleanup.
 

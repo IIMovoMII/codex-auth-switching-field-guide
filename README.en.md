@@ -43,6 +43,8 @@ The agent should inspect facts it can safely read and ask only for decisions you
 | One-action switching | Combine necessary checks, history preparation and activation in one entrypoint; keep advanced repair options separate |
 | Preserve evolving settings | Patch the current live configuration instead of alternating between two old copies |
 | Old-conversation compatibility | Check provider identity, model input and UI indexes separately; repair only proven-safe cases |
+| Routine incremental checks | Reuse unchanged-history results and parse proven appends; retain an explicit complete-check route |
+| Preserve model preferences | No silent model replacement or effort downgrade; optionally retain your chosen context limit |
 | Multiple accounts and relays, optionally | Keep credentials, model and reasoning level per profile without copying the whole config |
 | First-use guidance | Guide OAuth when missing, or collect missing API settings locally |
 | Recoverable failures | Distinguish login, configuration and history failures instead of asking users to keep retrying |
@@ -67,9 +69,9 @@ The lesson is to **reproduce the actual failing continuation path, preserve cont
 
 ## Why switching can sometimes be slow
 
-History validation often costs more than changing credentials. Unchanged history can use a fast check; new relay records, Codex updates or changed repair rules may require preparation again.
+History validation often costs more than changing credentials. The updated approach separates renewed preparation from reparsing every conversation: reuse unchanged-file results, parse only verified appends, and fully recheck relevant changes such as rewrites, archive moves or rule updates. Small edits need not copy an entire large transcript, but recovery evidence still comes first.
 
-One investigation traced minutes of delay to per-byte decoding in an interpreted script. Measure stages and optimize the actual bottleneck instead of skipping validation. First-use setup and routine switching should also report separate progress.
+A roughly 3.8 GB history copy took about 74 s to establish its baseline, 1.8 s for unchanged preparation and 4.6 s for each of two small-append rounds. **These are preparation timings, not total real account-switch timings or performance promises.** Appends still read old content for hashing. First login, rule changes and complex repairs may remain slow. See [incremental preparation](references/incremental-preparation.en.md).
 
 ## Handling Codex updates
 
@@ -89,7 +91,9 @@ Saving multiple official accounts does not automatically share cloud chats. Visi
 
 Field evidence is primarily from Windows. Adapt the design to macOS or Linux using local equivalents; **there is no claim of a finished or fully tested three-platform application**.
 
-Evidence includes native Codex CLI 0.159.2 pagination-copy tests, a 0.162.0-alpha.2 review of unreplayable reasoning, and 0.162.0-alpha.17.2 official warmup/continuation comparisons, full-copy repair and rollback, and read-only checks after a stopped-writer production run. PowerShell 5.1 and 7 regressions were also exercised. See [validation](references/validation.en.md) for evidence, gaps and measurements. Automatic recovery after forced termination or power loss during history repair has not completed acceptance and must not be presented as an existing capability. The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
+Evidence includes native Codex CLI 0.159.2 pagination-copy tests, a 0.162.0-alpha.2 review of unreplayable reasoning, and 0.162.0-alpha.17.2 official warmup/continuation comparisons, full-copy repair and rollback, and read-only checks after a stopped-writer production run. PowerShell 5.1 and 7 regressions were also exercised.
+
+The 2026-10-14 local revision adds incremental checks, small backups and a recovery gate for unfinished history transactions. Copy and simulated-interruption tests passed, but that revision has not performed a real account switch for the user, nor verified actual power loss or every forced-termination point. See [validation](references/validation.en.md). The green badge checks document structure, links and limited privacy patterns, not successful deployment on your machine.
 
 ## Contribute
 

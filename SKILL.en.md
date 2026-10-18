@@ -35,7 +35,8 @@ Keep responsibilities clear: centralize switch sequencing, failure handling and 
 - Multiple providers, models or reasoning levels: [multi-relay profiles](references/multi-relay-profiles.en.md).
 - Empty/template-overwritten config or CC Switch coexistence: [config recovery](references/config-recovery.en.md).
 - First-turn retries, proxies or timeouts: [network diagnostics](references/network-diagnostics.en.md).
-- Slow switching: measure scanning, projection proof, backup/repair and credential activation separately. Do not remove safety gates for speed; see the history guide's performance section.
+- Slow switching: measure stages first. When scale warrants optimization, read [incremental preparation](references/incremental-preparation.en.md). Reuse valid file results and parse appends after full-prefix proof; still check database dependencies and retain forced-complete inspection. Small slot backups have a narrow boundary. Less parsing does not mean no old-data reads.
+- A stable context limit across modes: see architecture's context policy. Honor the user's choice and verify config, catalog, cache and new-process effective values. The local 272000 choice is not a default for everyone or a claim that every request is billed at the maximum.
 - After a Codex update: establish whether relevant behavior remains covered by verified rules. A new version does not necessarily need a code change, and unchanged table structure does not prove unchanged behavior. Keep unknown compatibility write-gated and update readiness evidence only after verification.
 
 ## Invariants
@@ -47,9 +48,9 @@ Keep responsibilities clear: centralize switch sequencing, failure handling and 
 - Do not truncate or fabricate reasoning IDs/encrypted payloads, break tool pairing or create paginated ordinal gaps by deleting lines.
 - Unknown layouts, inconsistent provenance or concurrent changes require a stop, not a manually bumped readiness version.
 - Rollback cannot overwrite activity created after the repair. If reversal is unsafe, expose a clear manual-recovery state.
-- Inspect durable manifests before starting new switching or repair when history work is unfinished. Accept exception handling, config recovery and history crash recovery separately; proposed recovery capabilities are not implemented capabilities.
+- Inspect durable manifests before starting new switching or repair when history work is unfinished. Accept exception handling, simulated interruption, actual process termination and power-loss recovery separately. Reverse only known changes; one simulation cannot prove universal automatic crash recovery.
 - Report file activation, local checks and new-process real-request verification separately.
 
 ## Handoff
 
-Provide entrypoints, first-use/resume/recovery instructions, field ownership, bounded retention, test results and remaining risks. Pending restart, login or real-request verification needs an explicit next step. Promise only the environment and scope actually verified, not eternal lossless compatibility across all builds.
+Provide entrypoints, first-use/resume/recovery instructions, field ownership, bounded retention, source revision and concise changes, stage timings, test results and remaining risks. Exclude private state from source control. Pending restart, login or real-request verification needs an explicit next step. Promise only the environment and scope actually verified, not eternal lossless compatibility across all builds.

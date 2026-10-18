@@ -9,7 +9,7 @@ Inspect read-only before implementing. Return redacted findings, not config, aut
 - OS, actual Desktop/CLI versions, executables and state locations; they may use different builds or CODEX_HOME directories.
 - Active writers, external managers and unfinished transactions. A closed window is not a stopped process; merged/renamed apps invalidate fixed-name assumptions.
 - Effective config and its sources: user, project, native profile, CLI and environment. Layer support is version-specific; a visible file value may not win.
-- Route, model, reasoning level, transport and proxy; locations of plugins, MCP, skills, hooks, permissions and projects.
+- Route, model, reasoning level, context limit and its config/catalog/cache sources, transport and proxy; locations of plugins, MCP, skills, hooks, permissions and projects.
 - Auth kind/storage: OAuth, API key, missing or unreadable, without credential values.
 - Active/archived JSONL, SQLite schema, WAL, paginated/segmented/inherited history and cloud boundaries.
 - Protected snapshots, last validation and available recovery material.
@@ -32,6 +32,7 @@ Group unresolved decisions that affect implementation:
 - Must old tasks continue across every profile? What is acceptable when safe conversion is impossible?
 - Command-line, small window or an existing system entrypoint?
 - Should model/reasoning settings follow profiles or preserve the current selection?
+- Should context follow model defaults, profiles or a user-chosen shared cap? Do not add hard-coded limits without a relevant requirement.
 - When can Codex close? What recovery-space/retention tradeoff is acceptable?
 - Which tool owns routing, and should existing profiles be imported?
 

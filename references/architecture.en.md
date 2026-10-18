@@ -25,11 +25,13 @@ Preserve unrelated additional fields in a known layout. Stop for unknown fields 
 
 Match implementation size to the selected capabilities. Layering requires no plugin manager, update downloader or background scanner. Add multiple accounts, elaborate interfaces or further repair types only when needed. Separation helps contain changes; it does not guarantee every upgrade changes only one component. Network or provider errors must not automatically trigger history repair.
 
+Keep source revisions and concise changes covering rule changes, invalidation reasons, evidence and pending acceptance. This explains why a run is slow or rejected without relying on chat memory. Version programs, synthetic tests and docs, not real configuration, auth, catalog caches, transcripts, databases or recovery material.
+
 ## Fast path and invalidation
 
 The fast path reuses a scoped compatibility result. Skip full transcript scans, repeated backups and network probes without an invalidation reason only while relevant client behavior, target route/protocol, checked data and dependencies, and repair rules still match. Menu text and unrelated log changes should not invalidate history readiness; actual behavior/rule changes cannot be hidden by retaining an old version label.
 
-A simple implementation may recheck all relevant history when it changes, with measured timings. Add per-file or per-segment caching only when data volume warrants it. Appends, rewrites, truncation, moves, archives, related databases and WAL, parent segments and inherited history must invalidate the affected results. Incremental checks cover dependent records, not just the final lines. Recheck or stop on damaged caches or uncertain dependencies rather than assuming readiness.
+Separate final readiness from per-file evidence: chat changes expire the former without necessarily requiring every old file to be parsed. A simple implementation may recheck everything. When scale warrants it, reuse unchanged files, parse complete appends after hashing the full old prefix, and recheck database/inheritance dependencies. Rewrites, truncations and moves fully invalidate affected scope; changed rules, relevant schemas or damaged caches can require a new baseline. Retain a forced-complete route. See [incremental preparation](incremental-preparation.en.md) for the method and local evidence.
 
 Do not promise a fixed number of seconds or treat a timeout as permission to proceed. Measure startup, scanning, projection checks, backup/mutation and rechecks on the same data with equivalent decisions. Explain slow checks and progress; required history preparation always finishes before credential activation.
 
@@ -61,6 +63,16 @@ Official OAuth and a direct OpenAI API key are different auth modes. An official
 
 Do not swap entire config.toml copies. Unsupported TOML syntax should stop the narrow editor, not trigger replacement with a simplified template. Whole-config restoration belongs only to explicit recovery of a damaged file.
 
+## Context limits are a separate user policy
+
+Establish whether the user wants model defaults, per-profile limits or one shared limit across modes. Do not shrink or expand it unasked. The limit, auto-compaction threshold, currently occupied context and reasoning level are different settings; the limit alone is not the billed token count for every request.
+
+The local user chose 272000 for all models. With writers stopped, that implementation checks every `context_window` in the active catalog and `models_cache.json`, changes only mismatches and preserves model names/effort. Incomplete or unparseable catalogs stop before target auth. This is not a recommended universal value or proof that an endpoint supports arbitrary windows.
+
+New implementations should inspect supported `model_context_window`, `model_catalog_json` and effective overrides first (see the [official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)), choosing the smallest verifiable approach. If Desktop needs catalog/cache adaptation, test copies, patch confirmed fields only and define those files' own recovery and failure states. Do not assume the config/auth transaction rolls them back. Repeated switches satisfying the policy should not rewrite them.
+
+Verify representative new/old tasks and every managed model in a new process; caches and loaded tasks may retain old values. Changing the cap does not shrink accumulated context. Assess compaction separately, never edit historical token statistics to simulate success. A runtime may reserve part of the window: this local runtime reports 258400 after a 95% allowance, not another universal limit to copy. See [validation](validation.en.md) for per-model, cross-mode acceptance.
+
 ## One-action and advanced entrypoints
 
 A useful routine flow:
@@ -73,6 +85,8 @@ Select target → check writers and unfinished transactions → inspect current 
 ~~~
 
 Preparation and switching may share one user action, but preparation must finish before target auth activation. Explain why it is needed and report phase timings. If history mutation is outside authorization, ask first; declining does not establish old-thread compatibility.
+
+Choose preparation by target: the local two-mode case checks official history compatibility for relay→official and does not repeat that preparation when returning to the relay. Other accounts/providers may require separately verified target rules. Do not impose the most expensive one-way preparation on every switch or infer that all reverse switches never need checks.
 
 Advanced options can expose read-only diagnosis, scoped history rollback, re-login and configuration recovery. Do not add menus simply to appear complete.
 
