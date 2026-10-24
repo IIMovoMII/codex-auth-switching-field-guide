@@ -24,7 +24,7 @@ description: 按本机环境设计、审查或修复 Codex 官方 OAuth 与 API 
 1. 读取[总体设计](references/architecture.md)，明确路线、凭据、历史和重启验证的独立状态。针对用户已选择的能力建立验收条件。
 2. 从未官方登录、从未配置 API、认证过期或只有半套档案时，走[首次使用](references/first-use-bootstrap.md)。用户真实完成登录，工具保存进度；不能伪造 OAuth。
 3. 旧任务要跨模式续聊时，走[历史兼容](references/history-compatibility.md)。共同 provider 身份和响应项目编号兼容是两项不同工作；分页历史还必须核对并保留索引和继承关系。
-   不要只看 `item_`／`rs_` 前缀、长度或推理内容是否存在：即使编号合法且有加密内容，也可能在原生预热后的续传中触发服务端查找。遇到该错误或准备改旧编号时，阅读[续聊故障复盘](references/continuation-case-study.md)，先复现实际请求路径；只清理经类型、引用和原生副本验证可省略的旧模型输入 ID，不能清空全部 ID 或删掉推理内容。
+   不要只看 `item_`／`rs_` 前缀、长度或推理内容是否存在：即使编号合法且有加密内容，也可能在原生预热后的续传中触发服务端查找。遇到该错误或准备改旧编号时，阅读[续聊故障复盘](references/continuation-case-study.md)，先复现实际请求路径；只清理经类型、引用和原生副本验证可省略的旧模型输入 ID，不能清空全部 ID 或删掉推理内容。若报“模型编号与界面索引未证实独立”，且记录是没有界面项目的已终止子代理，再读[空界面子代理终态](references/empty-subagent-projection.md)；它只补充已证明的 `failed + task_complete` 或 `interrupted + turn_aborted(reason=interrupted)`，不取消一般来源门禁。
 4. 日常入口可以是一键切换：停写检查 → 快速就绪检查 → 必要的历史准备 → 路线与凭据事务 → 提示重启及后续验收。分离内部阶段，不强迫用户手工执行多条命令。
 5. 根据[安全与回滚](references/safety-and-rollback.md)实现失败路径，用[验证清单](references/validation.md)测试所选能力。准备失败必须发生在启用目标凭据之前。
 

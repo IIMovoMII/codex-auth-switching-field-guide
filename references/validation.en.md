@@ -35,6 +35,7 @@ Environment: Windows, Desktop's native runtime `0.162.0-alpha.17.2`. See the [co
 | Stopped-writer production run | 392 files applied; optional IDs cleared in 243,244 model records, one unreplayable reasoning item replaced in its byte slot, and zero database writes. After reopening, all repaired-prefix hashes matched, critical files passed content/byte-boundary checks, and three databases passed integrity checks | The current chat continued, compacted and indexed new messages; the original failing task was reloaded but not individually exercised with a new real task. Not acceptance for every old conversation |
 | Scale and timing | Roughly 2.5 GB copy: scanning 38.2 s, projection checks 109.5 s, backup/mutation/recheck 165.6 s; full copy/comparison/rollback exercise about 359 s | Not routine-switch timing or a cross-machine performance guarantee |
 | Interruption review | Unified history startup recovery was identified as a gap at that time; see the subsequent revision below | This row does not accept the later recovery implementation or prove actual forced-termination/power-loss recovery |
+| Empty subagent terminal state | 23 PowerShell 7/5.1 positive/negative cases cover failure, normal interruption, wrong reason/turn/root, existing UI rows, CRLF, incremental work and rollback; one redacted real-record copy changed only model input and rolled back exactly | Covers only the proven subagent terminal states; not arbitrary empty projections, unknown interruption reasons or future versions |
 
 ## Incremental revision evidence from 2026-10-14
 
@@ -82,6 +83,7 @@ Cover the supported layouts' relevant boundaries:
 - legal IDs with complete encrypted content failing after native warmup; repair changes only designated old model IDs, preserving tool pairing, guardian history, UI IDs and newly generated IDs;
 - direct model projections versus event projections, logical IDs versus storage segment IDs;
 - empty projections versus dangling references, materialized forks with copied parent metadata, proven backup/manifest layout recovery and refusal when evidence is insufficient;
+- terminal subagents without UI items: `failed + task_complete(error)` and `interrupted + turn_aborted(reason=interrupted)`, with refusal for wrong state/reason/references;
 - nonzero inherited baselines, missing segments, invalid ordinals/byte cursors and incomplete indexing;
 - appended events after repair, reopening, repeated rollback and newer activity;
 - changed rules, related database changes, unrelated log changes and damaged readiness records.

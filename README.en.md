@@ -67,6 +67,8 @@ An October 2026 investigation found that a scanner could report zero findings wh
 
 The lesson is to **reproduce the actual failing continuation path, preserve content and UI history, and validate repair and recovery**, not to bulk-rename every conversation. See the [case study](references/continuation-case-study.en.md) for the evidence and limits.
 
+On 2026-10-23, a related provenance refusal came from a native subagent that was interrupted before producing its first UI item; an empty pagination table was not corruption. The fix was not to remove the gate, but to prove two terminal states with matching parent/recipient evidence, terminal event, cursor and no dangling references. See [empty subagent projection](references/empty-subagent-projection.en.md).
+
 ## Why switching can sometimes be slow
 
 History validation often costs more than changing credentials. The updated approach separates renewed preparation from reparsing every conversation: reuse unchanged-file results, parse only verified appends, and fully recheck relevant changes such as rewrites, archive moves or rule updates. Small edits need not copy an entire large transcript, but recovery evidence still comes first.
